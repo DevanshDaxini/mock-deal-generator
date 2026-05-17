@@ -73,7 +73,7 @@ async def _call_with_retry(create_kwargs: dict, max_retries: int = 4) -> str:
     Waits respect the retry-after header when present.
     """
     from anthropic import RateLimitError
-    delay = 15
+    delay = 5
     for attempt in range(max_retries):
         try:
             message = await client.messages.create(**create_kwargs)
@@ -337,7 +337,7 @@ async def stage_3_generate_all_content(
     is fast enough that the rate-limit risk is low.
     """
     system_blocks = build_cached_system_blocks(stage1, config)
-    semaphore = asyncio.Semaphore(2)
+    semaphore = asyncio.Semaphore(4)
     total = len(events)
     completed_count = [0]
     results = [None] * total
