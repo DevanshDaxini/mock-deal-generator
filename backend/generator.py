@@ -7,6 +7,7 @@ Stage 3: Content generation (batched with concurrency limit)
 
 import json
 import asyncio
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any, Optional, Callable, Awaitable
@@ -30,11 +31,52 @@ MODEL = os.environ.get("CLAUDE_MODEL", "claude-haiku-4-5")
 # Max tokens per event type — tuned to actual output needs
 MAX_TOKENS_BY_TYPE = {
     "stage1": 4096,
-    "stage2": 10000,
+    "stage2": 6000,   # was 10000 — Haiku output limit is 10K/min; one request must not consume it all
     "call": 2500,
     "email": 1024,
     "crm_note": 400,
 }
+
+# Tier-1 output tokens per minute by model family
+_OUTPUT_TPM = {
+    "haiku": 10_000,
+    "sonnet": 8_000,
+    "opus": 80_000,
+}
+
+
+def _model_output_tpm() -> int:
+    m = MODEL.lower()
+    for family, tpm in _OUTPUT_TPM.items():
+        if family in m:
+            return tpm
+    return 8_000  # conservative fallback
+
+
+class _OutputTokenLimiter:
+    """
+    Sliding-window output-token rate limiter.
+    Blocks callers when the per-minute budget is exhausted and resumes
+    once the current window resets.
+    """
+    def __init__(self, tpm: int):
+        self._tpm = tpm
+        self._used = 0
+        self._window_start = time.monotonic()
+        self._lock = asyncio.Lock()
+
+    async def consume(self, tokens: int) -> None:
+        async with self._lock:
+            now = time.monotonic()
+            if now - self._window_start >= 60.0:
+                self._used = 0
+                self._window_start = now
+            if self._used + tokens > self._tpm:
+                wait = 61.0 - (now - self._window_start)
+                await asyncio.sleep(max(wait, 0))
+                self._used = 0
+                self._window_start = time.monotonic()
+            self._used += tokens
 
 ProgressCallback = Callable[[str, str, int], Awaitable[None]]
 
@@ -67,17 +109,17 @@ def _parse_claude_response(text: str) -> str:
             raise Exception(f"Claude response is not valid JSON: {str(parse_err)}\n\nFull response saved to /tmp/claude_response.json")
 
 
-async def _call_with_retry(create_kwargs: dict, max_retries: int = 4) -> str:
+async def _call_with_retry(create_kwargs: dict, max_retries: int = 4) -> tuple[str, int]:
     """
     Call Claude API with exponential backoff on 429 rate limit errors.
-    Waits respect the retry-after header when present.
+    Returns (content, output_token_count).
     """
     from anthropic import RateLimitError
     delay = 5
     for attempt in range(max_retries):
         try:
             message = await client.messages.create(**create_kwargs)
-            return _parse_claude_response(message.content[0].text)
+            return _parse_claude_response(message.content[0].text), message.usage.output_tokens
         except RateLimitError as e:
             if attempt == max_retries - 1:
                 raise
@@ -87,25 +129,34 @@ async def _call_with_retry(create_kwargs: dict, max_retries: int = 4) -> str:
 
 async def call_claude(prompt: str, max_tokens: int) -> str:
     """Call Claude with plain system prompt. Returns valid JSON string."""
-    return await _call_with_retry({
+    text, _ = await _call_with_retry({
         "model": MODEL,
         "max_tokens": max_tokens,
         "system": SYSTEM_PROMPT,
         "messages": [{"role": "user", "content": prompt}],
     })
+    return text
 
 
-async def call_claude_cached(system_blocks: list, prompt: str, max_tokens: int) -> str:
+async def call_claude_cached(
+    system_blocks: list,
+    prompt: str,
+    max_tokens: int,
+    limiter: Optional[_OutputTokenLimiter] = None,
+) -> str:
     """
-    Call Claude with cached system blocks. Use for stage-3 calls where deal
-    context is stable across many events in a single deal generation.
+    Call Claude with cached system blocks. Pass a limiter to enforce the
+    output-token-per-minute budget (Tier 1: 10K/min for Haiku).
     """
-    return await _call_with_retry({
+    text, output_tokens = await _call_with_retry({
         "model": MODEL,
         "max_tokens": max_tokens,
         "system": system_blocks,
         "messages": [{"role": "user", "content": prompt}],
     })
+    if limiter:
+        await limiter.consume(output_tokens)
+    return text
 
 
 def build_cached_system_blocks(stage1: Dict[str, Any], config: Dict[str, Any]) -> list:
@@ -235,6 +286,7 @@ async def stage_3_generate_call_content(
     prior_summary: str,
     champion_entered: bool,
     system_blocks: list,
+    limiter: Optional[_OutputTokenLimiter] = None,
 ) -> Dict[str, Any]:
     participants_detail = "\n".join([
         f"- {p['name']} ({p['role']})"
@@ -261,7 +313,7 @@ async def stage_3_generate_call_content(
         prior_events_summary=prior_summary,
     )
 
-    response = await call_claude_cached(system_blocks, prompt, MAX_TOKENS_BY_TYPE["call"])
+    response = await call_claude_cached(system_blocks, prompt, MAX_TOKENS_BY_TYPE["call"], limiter)
     content = json.loads(response)
     event.update(content)
     return event
@@ -274,6 +326,7 @@ async def stage_3_generate_email_content(
     prior_summary: str,
     all_events: List[Dict[str, Any]],
     system_blocks: list,
+    limiter: Optional[_OutputTokenLimiter] = None,
 ) -> Dict[str, Any]:
     reply_context = ""
     if event.get('reply_to_id'):
@@ -297,7 +350,7 @@ From: {parent.get('sender', {}).get('name', '')}
         prior_events_summary=prior_summary,
     )
 
-    response = await call_claude_cached(system_blocks, prompt, MAX_TOKENS_BY_TYPE["email"])
+    response = await call_claude_cached(system_blocks, prompt, MAX_TOKENS_BY_TYPE["email"], limiter)
     content = json.loads(response)
     event.update(content)
     return event
@@ -309,6 +362,7 @@ async def stage_3_generate_crm_note_content(
     config: Dict[str, Any],
     prior_summary: str,
     system_blocks: list,
+    limiter: Optional[_OutputTokenLimiter] = None,
 ) -> Dict[str, Any]:
     prompt = STAGE_3_CRM_NOTE_PROMPT_TEMPLATE.format(
         company_name=stage1['company']['name'],
@@ -318,7 +372,7 @@ async def stage_3_generate_crm_note_content(
         note_preview=event.get('note_preview', ''),
     )
 
-    response = await call_claude_cached(system_blocks, prompt, MAX_TOKENS_BY_TYPE["crm_note"])
+    response = await call_claude_cached(system_blocks, prompt, MAX_TOKENS_BY_TYPE["crm_note"], limiter)
     content = json.loads(response)
     event.update(content)
     return event
@@ -333,11 +387,12 @@ async def stage_3_generate_all_content(
     """
     Stage 3: Generate content for all events with bounded concurrency.
     Builds a shared cached system block with deal context to amortize
-    token cost across all event calls. Concurrency raised to 5 — Haiku
-    is fast enough that the rate-limit risk is low.
+    token cost across all event calls. An output-token limiter enforces
+    the Tier-1 per-minute budget to avoid 429s.
     """
     system_blocks = build_cached_system_blocks(stage1, config)
-    semaphore = asyncio.Semaphore(4)
+    semaphore = asyncio.Semaphore(2)
+    limiter = _OutputTokenLimiter(_model_output_tpm())
     total = len(events)
     completed_count = [0]
     results = [None] * total
@@ -352,11 +407,11 @@ async def stage_3_generate_all_content(
         async with semaphore:
             record_type = event['record_type']
             if record_type == 'call':
-                result = await stage_3_generate_call_content(event, stage1, config, prior_summary, champion_entered, system_blocks)
+                result = await stage_3_generate_call_content(event, stage1, config, prior_summary, champion_entered, system_blocks, limiter)
             elif record_type == 'email':
-                result = await stage_3_generate_email_content(event, stage1, config, prior_summary, events, system_blocks)
+                result = await stage_3_generate_email_content(event, stage1, config, prior_summary, events, system_blocks, limiter)
             elif record_type == 'crm_note':
-                result = await stage_3_generate_crm_note_content(event, stage1, config, prior_summary, system_blocks)
+                result = await stage_3_generate_crm_note_content(event, stage1, config, prior_summary, system_blocks, limiter)
             else:
                 result = event
 
