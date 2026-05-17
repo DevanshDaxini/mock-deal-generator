@@ -19,7 +19,7 @@ const Layout = () => {
   return (
     <div className="flex h-screen bg-white">
       {/* Sidebar: 280px fixed left */}
-      <div className="w-80 flex-shrink-0 bg-gray-50 border-r border-gray-200">
+      <div className="flex-shrink-0 bg-gray-50 border-r border-gray-200" style={{ width: '280px' }}>
         <DealSidebar />
       </div>
 
