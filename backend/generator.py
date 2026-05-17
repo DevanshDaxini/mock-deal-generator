@@ -45,7 +45,7 @@ async def call_claude_with_retry(prompt: str, max_retries: int = 1) -> str:
     """
     message = await client.messages.create(
         model=MODEL,
-        max_tokens=4096,
+        max_tokens=8192,
         system=SYSTEM_PROMPT,
         messages=[
             {"role": "user", "content": prompt}
@@ -74,7 +74,10 @@ async def call_claude_with_retry(prompt: str, max_retries: int = 1) -> str:
             json.loads(fixed)
             return fixed
         except:
-            raise Exception(f"Claude response is not valid JSON: {str(parse_err)}\n\nResponse:\n{response[:500]}")
+            # Log full response for debugging
+            with open("/tmp/claude_response.json", "w") as f:
+                f.write(response)
+            raise Exception(f"Claude response is not valid JSON: {str(parse_err)}\n\nFull response saved to /tmp/claude_response.json")
 
 async def stage_1_generate_foundation(config: Dict[str, Any], deal_start_date: str, deal_end_date: str) -> Dict[str, Any]:
     """
