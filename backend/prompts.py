@@ -21,6 +21,9 @@ Starting Sentiment: {starting_sentiment}
 Ending Sentiment: {ending_sentiment}
 Champion Entry: {champion_entry}
 {company_name_line}
+{ae_name_line}
+{se_name_line}
+{business_use_case_line}
 
 Return a single JSON object with this exact structure:
 {{
@@ -38,6 +41,11 @@ Return a single JSON object with this exact structure:
     "title": "Account Executive",
     "email": "string (firstname.lastname@vendorcompany.com)",
     "vendor_company": "string (fictional SaaS vendor name)"
+  }},
+  "sales_engineer": {{
+    "name": "string",
+    "email": "string (firstname.lastname@vendorcompany.com)",
+    "vendor_company": "string (same as sales_rep vendor_company)"
   }},
   "stakeholders": [
     {{
@@ -81,7 +89,12 @@ Rules:
 - If complexity is "simple": 1-2 objections, all resolved. Mostly supporter/neutral stakeholders.
 - If complexity is "normal": 3-4 objections, most resolved. At least one skeptic.
 - If complexity is "messy": 5+ objections, some unresolved. At least one blocker. Include budget, security, and procurement objections.
-- If deal_outcome is "closed_lost": at least one objection must remain unresolved."""
+- If deal_outcome is "closed_lost": at least one objection must remain unresolved.
+- If ae_name is provided, use it as the sales_rep name exactly. Otherwise generate a realistic name.
+- If se_name is provided, use it as the sales_engineer name exactly. Otherwise generate a realistic name.
+- The sales_engineer must use the same vendor_company as sales_rep.
+- SE appears in demo and evaluation stage calls as a technical resource.
+- If business_use_case is provided, use it to shape objections, stakeholder archetypes, and deal narrative.
 
 # ============= STAGE 1 CS: Customer Success Context =============
 
@@ -297,20 +310,21 @@ For "crm_note" events additionally:
 Ordering and distribution rules:
 1. First event must be an outbound email (record_type: "email", purpose: "outbound").
 2. Second event must be a prospect reply email.
-3. Distribute {num_calls} calls across stages: 1 in Discovery, 1 in Demo, remainder in Evaluation/Negotiation.
-4. Generate {emails_per_stage} emails per active stage forming reply chains within each stage.
-5. Add CRM notes after each call, when an objection is introduced, when champion appears, and when a risk event occurs.
-6. Champion appearance rule — insert a CRM note with note_preview "Champion [name] emerged and aligned internally" at:
+3. If is_series is true: the first event in the Prospecting stage must be a call with call_type "Cold Call - Initial Outreach".
+4. Distribute {num_calls} calls across stages: 1 in Discovery, 1 in Demo, remainder in Evaluation/Negotiation.
+5. Generate {emails_per_stage} emails per active stage forming reply chains within each stage.
+6. Add CRM notes after each call, when an objection is introduced, when champion appears, and when a risk event occurs.
+7. Champion appearance rule — insert a CRM note with note_preview "Champion [name] emerged and aligned internally" at:
    - "before_discovery": after outbound email, before discovery call
    - "during_discovery": after discovery call
    - "after_demo": after demo call
    - "during_procurement": during Evaluation stage
    - "late_stage_rescue": during Negotiation stage
    - "none": do not add any champion note
-7. If complexity is "messy": add CRM notes in Evaluation with note_preview containing "procurement delay", "budget concern", "timeline slippage", and "champion risk".
-8. If deal_outcome is "closed_lost": final event must be a CRM note with note_preview "Deal lost — [reason]".
-9. All timestamps must be weekdays between 08:00 and 18:00.
-10. Events must be strictly chronologically ordered.
+8. If complexity is "messy": add CRM notes in Evaluation with note_preview containing "procurement delay", "budget concern", "timeline slippage", and "champion risk".
+9. If deal_outcome is "closed_lost": final event must be a CRM note with note_preview "Deal lost — [reason]".
+10. All timestamps must be weekdays between 08:00 and 18:00.
+11. Events must be strictly chronologically ordered.
 
 Return only the JSON array, no other text."""
 
