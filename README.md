@@ -203,6 +203,31 @@ Prompt caching in Stage 3 reduces costs ~20–30% on deals with 30+ events.
 
 ---
 
+## Stress Testing
+
+To validate the system performs reliably across a wide range of parameters, concurrent loads, and edge cases, run the comprehensive stress testing suite:
+
+```bash
+cd backend
+python tests/run_stress_tests.py
+```
+
+The suite covers:
+- **Parameter edge cases:** Min/max inputs, all enum values, unicode, special characters
+- **Concurrent load:** Multiple deals generated simultaneously
+- **Output validation:** Deal structure, sentiment arcs, timeline ordering
+- **Performance:** Generation time, token usage, cost estimation
+- **Error resilience:** Invalid inputs, boundary conditions
+- **Rate limiter & cache:** Concurrent request handling and cache effectiveness
+- **Token budgets:** Stage-wise and total token usage limits
+- **API vs direct:** Comparing API endpoint and direct generator output
+
+For detailed guidance, see [Stress Testing Guide](./docs/stress-testing-guide.md).
+
+Metrics and cost analysis are saved to `backend/tests/reports/`.
+
+---
+
 ## Project structure
 
 ```
