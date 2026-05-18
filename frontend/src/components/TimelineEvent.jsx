@@ -25,7 +25,7 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
   const sentimentKey = normalizeSentiment(event.sentiment)
   const sentimentLabel = sentimentKey.charAt(0).toUpperCase() + sentimentKey.slice(1)
 
-  const typeLabel = { call: 'Call', email: 'Email', crm_note: 'Note' }[event.record_type] || '–'
+  const typeLabel = { call: 'Call', email: 'Email', crm_note: 'Note', support_ticket: 'Ticket', support_call: 'Support' }[event.record_type] || '–'
 
   const cardStyle = {
     background: 'var(--surface)',
@@ -52,10 +52,16 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px' }}>
               <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {event.record_type === 'call' ? event.title : event.record_type === 'email' ? event.subject : 'CRM Note'}
+                {event.record_type === 'call' ? event.title : event.record_type === 'email' ? event.subject : event.record_type === 'support_ticket' ? event.subject : event.record_type === 'support_call' ? `Call with ${event.initiated_by_name}` : 'CRM Note'}
               </span>
               {event.record_type === 'email' && event.sender?.name && (
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{event.sender.name}</span>
+              )}
+              {event.record_type === 'support_ticket' && event.created_by_name && (
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{event.created_by_name}</span>
+              )}
+              {event.record_type === 'support_call' && event.support_engineer && (
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Engineer: {event.support_engineer}</span>
               )}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
@@ -63,6 +69,10 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
                 ? event.author
                 : event.record_type === 'call'
                 ? getStakeholderNames(event.participants?.map(p => p.stakeholder_id) || [])
+                : event.record_type === 'support_ticket'
+                ? event.category
+                : event.record_type === 'support_call'
+                ? event.category
                 : null}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>
@@ -91,11 +101,13 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
         </span>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text)', marginBottom: '4px' }}>
-            {event.record_type === 'call' ? event.title : event.record_type === 'email' ? event.subject : 'CRM Note'}
+            {event.record_type === 'call' ? event.title : event.record_type === 'email' ? event.subject : event.record_type === 'support_ticket' ? event.subject : event.record_type === 'support_call' ? `Call with ${event.initiated_by_name}` : 'CRM Note'}
           </div>
           <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
             {event.record_type === 'crm_note' ? event.author
               : event.record_type === 'call' ? getStakeholderNames(event.participants?.map(p => p.stakeholder_id) || [])
+              : event.record_type === 'support_ticket' ? `${event.created_by_name} · ${event.priority}`
+              : event.record_type === 'support_call' ? `${event.support_engineer} · ${event.duration_minutes} min`
               : null}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>{formatDate(event.timestamp)}</div>
@@ -158,6 +170,76 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
           <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Internal Note</div>
           <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: '1.6', marginBottom: '10px' }}>{event.content}</p>
           <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{event.author} · {formatDate(event.timestamp)}</div>
+        </div>
+      )}
+
+      {/* Support Ticket content */}
+      {event.record_type === 'support_ticket' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Details</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '2px' }}>Ticket ID</div>
+                <div style={{ color: 'var(--text)' }}>{event.ticket_id}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '2px' }}>Priority</div>
+                <div style={{ color: 'var(--text)' }}>{event.priority?.charAt(0).toUpperCase() + event.priority?.slice(1)}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '2px' }}>Category</div>
+                <div style={{ color: 'var(--text)' }}>{event.category?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '2px' }}>Status</div>
+                <div style={{ color: 'var(--text)' }}>{event.status?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Description</div>
+            <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: '1.6' }}>{event.description}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Support Call content */}
+      {event.record_type === 'support_call' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Details</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '2px' }}>Support Engineer</div>
+                <div style={{ color: 'var(--text)' }}>{event.support_engineer}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '2px' }}>Duration</div>
+                <div style={{ color: 'var(--text)' }}>{event.duration_minutes} minutes</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '2px' }}>Category</div>
+                <div style={{ color: 'var(--text)' }}>{event.category?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '2px' }}>Type</div>
+                <div style={{ color: 'var(--text)' }}>{event.call_type?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Transcript</div>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--rule)', borderRadius: '6px', padding: '12px', fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'monospace', whiteSpace: 'pre-wrap', maxHeight: '320px', overflowY: 'auto', lineHeight: '1.6' }}>
+              {event.transcript}
+            </div>
+          </div>
+          {event.resolution && (
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Resolution</div>
+              <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: '1.6' }}>{event.resolution}</p>
+            </div>
+          )}
         </div>
       )}
     </div>
