@@ -36,39 +36,40 @@ def run_tests():
 
     for idx, (name, module) in enumerate(test_suites, 1):
         progress = f"[{idx}/{len(test_suites)}]"
-        print(f"{progress} Running {name}...", end=" ", flush=True)
+        print(f"\n[Running] {name}...\n")
         suite_start = time.time()
 
-        result = subprocess.run(
+        process = subprocess.Popen(
             ["python", "-m", "pytest", str(test_dir / module), "-v", "--tb=short"],
             cwd=str(backend_dir),
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
+            bufsize=1,
         )
 
+        output_lines = []
+        for line in process.stdout:
+            print(line, end="", flush=True)
+            output_lines.append(line)
+
+        process.wait()
         elapsed = time.time() - suite_start
-        passed = result.stdout.count(" PASSED")
-        failed = result.stdout.count(" FAILED")
+        full_output = "".join(output_lines)
+
+        passed = full_output.count(" PASSED")
+        failed = full_output.count(" FAILED")
 
         results[name] = {
             "passed": passed,
             "failed": failed,
-            "exit_code": result.returncode,
+            "exit_code": process.returncode,
             "elapsed": elapsed,
         }
 
-        status = "✓" if result.returncode == 0 else "✗"
-        print(f"{status} ({passed}P {failed}F) {elapsed:.1f}s")
+        status = "✓" if process.returncode == 0 else "✗"
+        print(f"\n{progress} {status} {name}: {passed} passed, {failed} failed in {elapsed:.1f}s")
 
-        # Show first error if any
-        if result.returncode != 0 and failed > 0:
-            lines = result.stdout.split('\n')
-            for i, line in enumerate(lines):
-                if 'FAILED' in line or 'ERROR' in line:
-                    print(f"  └─ {line.strip()}")
-                    break
-
-    # Print summary
     total_elapsed = time.time() - total_start
     print("\n" + "="*70)
     print("SUMMARY")
