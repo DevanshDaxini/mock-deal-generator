@@ -245,12 +245,22 @@ def build_cached_system_blocks(
     minimum needed for Haiku 4.5 cache hits to activate. Without it the
     prefix sits at ~1.5K tokens and cache writes silently fail.
     """
+    ae_profile = []
+    if config.get('ae_experience'): ae_profile.append(f"experience={config['ae_experience']}")
+    if config.get('ae_style'): ae_profile.append(f"style={config['ae_style']}")
+    ae_profile_str = f" ({', '.join(ae_profile)})" if ae_profile else ""
+
     se = stage1.get('sales_engineer')
-    se_line = f"Sales Engineer: {se['name']} <{se['email']}>" if se else ""
+    se_profile = []
+    if config.get('se_technical_depth'): se_profile.append(f"depth={config['se_technical_depth']}")
+    if config.get('se_involvement'): se_profile.append(f"involvement={config['se_involvement']}")
+    se_profile_str = f" ({', '.join(se_profile)})" if se_profile else ""
+
+    se_line = f"Sales Engineer: {se['name']} <{se['email']}>{se_profile_str}" if se else ""
 
     deal_context = (
         f"Deal context for this generation run:\n"
-        f"AE: {stage1['sales_rep']['name']} <{stage1['sales_rep']['email']}>\n"
+        f"AE: {stage1['sales_rep']['name']} <{stage1['sales_rep']['email']}>{ae_profile_str}\n"
         f"{se_line}\n"
         f"Company: {json.dumps(stage1['company'])}\n"
         f"Stakeholders: {json.dumps(stage1['stakeholders'])}\n"
@@ -288,7 +298,19 @@ async def stage_1_generate_foundation(
     )
 
     ae_name_line = f"AE Name: {config.get('ae_name')}" if config.get('ae_name') else ""
+
+    ae_profile_parts = []
+    if config.get('ae_experience'): ae_profile_parts.append(f"Experience: {config['ae_experience']}")
+    if config.get('ae_style'): ae_profile_parts.append(f"Style: {config['ae_style']}")
+    ae_profile_line = f"AE Profile: {', '.join(ae_profile_parts)}" if ae_profile_parts else ""
+
     se_name_line = f"SE Name: {config.get('se_name')}" if config.get('se_name') else ""
+
+    se_profile_parts = []
+    if config.get('se_technical_depth'): se_profile_parts.append(f"Technical Depth: {config['se_technical_depth']}")
+    if config.get('se_involvement'): se_profile_parts.append(f"Involvement: {config['se_involvement']}")
+    se_profile_line = f"SE Profile: {', '.join(se_profile_parts)}" if se_profile_parts else ""
+
     business_use_case_line = f"Business Use Case: {config.get('business_use_case')}" if config.get('business_use_case') else ""
 
     prompt = STAGE_1_PROMPT_TEMPLATE.format(
@@ -307,7 +329,9 @@ async def stage_1_generate_foundation(
         deal_start_date=deal_start_date,
         deal_end_date=deal_end_date,
         ae_name_line=ae_name_line,
+        ae_profile_line=ae_profile_line,
         se_name_line=se_name_line,
+        se_profile_line=se_profile_line,
         business_use_case_line=business_use_case_line,
     )
 
@@ -443,7 +467,12 @@ async def _stage_2_generate_calls(
     limiter: Optional[_OutputTokenLimiter] = None,
     token_tracker: Optional['TokenTracker'] = None,
 ) -> List[Dict[str, Any]]:
-    """Generate call events only."""
+    """Generate call events with cached system blocks to avoid repeating stage1."""
+    system_blocks = [
+        {"type": "text", "text": SYSTEM_PROMPT},
+        {"type": "text", "text": f"Deal foundation:\n{stage1_json}", "cache_control": {"type": "ephemeral"}},
+    ]
+
     prompt = STAGE_2_CALLS_PROMPT_TEMPLATE.format(
         stage1_json=stage1_json,
         deal_start_date=deal_start_date,
@@ -454,7 +483,14 @@ async def _stage_2_generate_calls(
         is_series=config.get('is_series', False),
     )
     try:
-        response = await call_claude(prompt, MAX_TOKENS_BY_TYPE["stage2"], limiter, stage="stage2_calls", token_tracker=token_tracker)
+        response = await call_claude_cached(
+            system_blocks,
+            prompt,
+            MAX_TOKENS_BY_TYPE["stage2"],
+            limiter,
+            stage="stage2_calls",
+            token_tracker=token_tracker,
+        )
         return json.loads(response)
     except (json.JSONDecodeError, ValueError) as e:
         raise ValueError(f"Stage 2 calls chunk parse failed: {e}") from e
@@ -469,7 +505,12 @@ async def _stage_2_generate_emails(
     limiter: Optional[_OutputTokenLimiter] = None,
     token_tracker: Optional['TokenTracker'] = None,
 ) -> List[Dict[str, Any]]:
-    """Generate email events only, with call context."""
+    """Generate email events with cached system blocks."""
+    system_blocks = [
+        {"type": "text", "text": SYSTEM_PROMPT},
+        {"type": "text", "text": f"Deal foundation:\n{stage1_json}", "cache_control": {"type": "ephemeral"}},
+    ]
+
     prompt = STAGE_2_EMAILS_PROMPT_TEMPLATE.format(
         stage1_json=stage1_json,
         call_events_json=json.dumps(call_events),
@@ -479,7 +520,14 @@ async def _stage_2_generate_emails(
         main_objection=config['main_objection'],
     )
     try:
-        response = await call_claude(prompt, MAX_TOKENS_BY_TYPE["stage2"], limiter, stage="stage2_emails", token_tracker=token_tracker)
+        response = await call_claude_cached(
+            system_blocks,
+            prompt,
+            MAX_TOKENS_BY_TYPE["stage2"],
+            limiter,
+            stage="stage2_emails",
+            token_tracker=token_tracker,
+        )
         return json.loads(response)
     except (json.JSONDecodeError, ValueError) as e:
         raise ValueError(f"Stage 2 emails chunk parse failed: {e}") from e
@@ -495,7 +543,12 @@ async def _stage_2_generate_crm_notes(
     limiter: Optional[_OutputTokenLimiter] = None,
     token_tracker: Optional['TokenTracker'] = None,
 ) -> List[Dict[str, Any]]:
-    """Generate CRM note events only, with call + email context."""
+    """Generate CRM note events with cached system blocks."""
+    system_blocks = [
+        {"type": "text", "text": SYSTEM_PROMPT},
+        {"type": "text", "text": f"Deal foundation:\n{stage1_json}", "cache_control": {"type": "ephemeral"}},
+    ]
+
     prompt = STAGE_2_CRM_NOTES_PROMPT_TEMPLATE.format(
         stage1_json=stage1_json,
         call_events_json=json.dumps(call_events),
@@ -507,7 +560,14 @@ async def _stage_2_generate_crm_notes(
         deal_outcome=config['deal_outcome'],
     )
     try:
-        response = await call_claude(prompt, MAX_TOKENS_BY_TYPE["stage2"], limiter, stage="stage2_crm", token_tracker=token_tracker)
+        response = await call_claude_cached(
+            system_blocks,
+            prompt,
+            MAX_TOKENS_BY_TYPE["stage2"],
+            limiter,
+            stage="stage2_crm",
+            token_tracker=token_tracker,
+        )
         return json.loads(response)
     except (json.JSONDecodeError, ValueError) as e:
         raise ValueError(f"Stage 2 CRM notes chunk parse failed: {e}") from e
@@ -927,7 +987,11 @@ async def generate_complete_deal(
             'num_stakeholders': config['num_stakeholders'],
             'complexity': config['complexity'],
             'ae_name': config.get('ae_name'),
+            'ae_experience': config.get('ae_experience'),
+            'ae_style': config.get('ae_style'),
             'se_name': config.get('se_name'),
+            'se_technical_depth': config.get('se_technical_depth'),
+            'se_involvement': config.get('se_involvement'),
             'business_use_case': config.get('business_use_case'),
             'is_series': config.get('is_series', False),
         },
