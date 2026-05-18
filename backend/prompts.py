@@ -261,7 +261,130 @@ Rules:
 
 Return only the JSON object, no other text."""
 
-# ============= STAGE 2: Timeline Scaffold =============
+# ============= STAGE 2: Chunked Timeline Scaffold =============
+
+STAGE_2_CALLS_PROMPT_TEMPLATE = """Given this deal foundation, generate CALL EVENTS ONLY.
+
+Deal Foundation:
+{stage1_json}
+
+Configuration:
+- Deal start date: {deal_start_date}
+- Deal end date: {deal_end_date}
+- Number of calls: {num_calls}
+- Champion enters: {champion_entry}
+- Complexity: {complexity}
+- Is series: {is_series}
+
+Return a JSON array of CALL event scaffolds ONLY:
+
+For each call:
+- "id": uuid4
+- "record_type": "call"
+- "date": "YYYY-MM-DD"
+- "timestamp": ISO 8601
+- "stage": [Prospecting, Discovery, Demo, Evaluation, Negotiation, Closed]
+- "sentiment": [positive, neutral, concerned, negative]
+- "title": string
+- "call_type": [Discovery, Demo, Technical Validation, Security Review, Procurement, Negotiation, Executive Alignment, Cold Call - Initial Outreach]
+- "participants": array of {{stakeholder_id, name, role}}
+
+Rules:
+1. Distribute calls across stages: 1 Discovery, 1 Demo, remainder in Evaluation/Negotiation
+2. If is_series true: first event must be "Cold Call - Initial Outreach"
+3. All timestamps weekdays 08:00-18:00
+4. Chronologically ordered by date
+5. Do NOT include any emails or CRM notes
+
+Return only JSON array, no other text."""
+
+STAGE_2_EMAILS_PROMPT_TEMPLATE = """Given this deal foundation and call schedule, generate EMAIL EVENTS ONLY.
+
+Deal Foundation:
+{stage1_json}
+
+Call Events (for reference):
+{call_events_json}
+
+Configuration:
+- Deal start date: {deal_start_date}
+- Deal end date: {deal_end_date}
+- Emails per stage: {emails_per_stage}
+- Main objection: {main_objection}
+
+Return a JSON array of EMAIL event scaffolds ONLY:
+
+For each email:
+- "id": uuid4
+- "record_type": "email"
+- "date": "YYYY-MM-DD"
+- "timestamp": ISO 8601
+- "stage": [Prospecting, Discovery, Demo, Evaluation, Negotiation, Closed]
+- "sentiment": [positive, neutral, concerned, negative]
+- "subject": string
+- "thread_id": uuid4
+- "reply_to_id": uuid4 or null
+- "is_forward": boolean
+- "purpose": [outbound, follow_up, scheduling, pricing, security, procurement, approval]
+- "sender": {{stakeholder_id, name, email}}
+- "recipients": array of {{name, email}}
+- "cc": array of {{name, email}}
+
+Rules:
+1. First event overall must be outbound email (before any calls)
+2. Second event must be prospect reply
+3. Generate {emails_per_stage} emails per stage, forming reply chains within stages
+4. Space emails between calls (don't cluster them)
+5. Threads should have 2-4 related emails (outbound → reply → follow-up)
+6. All timestamps weekdays 08:00-18:00
+7. Chronologically ordered by date
+8. Do NOT include any calls or CRM notes
+
+Return only JSON array, no other text."""
+
+STAGE_2_CRM_NOTES_PROMPT_TEMPLATE = """Given this deal foundation and existing events, generate CRM NOTE EVENTS ONLY.
+
+Deal Foundation:
+{stage1_json}
+
+Existing Events (calls + emails):
+- Calls: {call_events_json}
+- Emails: {email_events_json}
+
+Configuration:
+- Deal start date: {deal_start_date}
+- Deal end date: {deal_end_date}
+- Champion entry: {champion_entry}
+- Complexity: {complexity}
+- Deal outcome: {deal_outcome}
+
+Return a JSON array of CRM NOTE event scaffolds ONLY:
+
+For each CRM note:
+- "id": uuid4
+- "record_type": "crm_note"
+- "date": "YYYY-MM-DD"
+- "timestamp": ISO 8601
+- "stage": [Prospecting, Discovery, Demo, Evaluation, Negotiation, Closed]
+- "sentiment": [positive, neutral, concerned, negative]
+- "note_preview": string (10-15 words, will be used as prompt seed in Stage 3)
+- "author": string (sales rep name)
+- "is_internal": true
+
+Rules:
+1. Add CRM note after each call with note_preview summarizing call outcome
+2. Add note when objection is introduced in emails/calls
+3. Add note when champion appears (per champion_entry timing)
+4. If complexity "messy": add risk notes about "procurement delay", "budget concern", "timeline slippage"
+5. If deal_outcome "closed_lost": final note with "Deal lost — [reason]"
+6. All timestamps weekdays 08:00-18:00
+7. Chronologically ordered by date
+8. Dates should align with existing calls/emails (same day or next business day after triggering event)
+9. Do NOT include any calls or emails
+
+Return only JSON array, no other text."""
+
+# ============= STAGE 2: Timeline Scaffold (Legacy - kept for backward compat) =============
 
 STAGE_2_PROMPT_TEMPLATE = """Given this deal foundation, generate a complete chronological timeline scaffold.
 

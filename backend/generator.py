@@ -159,14 +159,20 @@ async def _call_with_retry(create_kwargs: dict, max_retries: int = 4) -> tuple[s
             delay = min(delay * 2, 60)
 
 
-async def call_claude(prompt: str, max_tokens: int) -> str:
+async def call_claude(
+    prompt: str,
+    max_tokens: int,
+    limiter: Optional[_OutputTokenLimiter] = None,
+) -> str:
     """Call Claude with plain system prompt. Returns valid JSON string."""
-    text, _ = await _call_with_retry({
+    text, output_tokens = await _call_with_retry({
         "model": MODEL,
         "max_tokens": max_tokens,
         "system": SYSTEM_PROMPT,
         "messages": [{"role": "user", "content": prompt}],
     })
+    if limiter:
+        await limiter.consume(output_tokens)
     return text
 
 
@@ -329,12 +335,14 @@ async def stage_2_generate_timeline_scaffold(
     stage1_output: Dict[str, Any],
     config: Dict[str, Any],
     deal_start_date: str,
-    deal_end_date: str
+    deal_end_date: str,
+    progress_callback: Optional[ProgressCallback] = None,
+    external_limiter: Optional[_OutputTokenLimiter] = None,
 ) -> List[Dict[str, Any]]:
     """Generate Stage 2 timeline. Uses chunked approach for series/long cycles."""
     # Use chunked approach for better reliability with large timelines
     return await stage_2_generate_timeline_scaffold_chunked(
-        stage1_output, config, deal_start_date, deal_end_date
+        stage1_output, config, deal_start_date, deal_end_date, progress_callback, external_limiter
     )
 
 
@@ -342,32 +350,41 @@ async def stage_2_generate_timeline_scaffold_chunked(
     stage1_output: Dict[str, Any],
     config: Dict[str, Any],
     deal_start_date: str,
-    deal_end_date: str
+    deal_end_date: str,
+    progress_callback: Optional[ProgressCallback] = None,
+    external_limiter: Optional[_OutputTokenLimiter] = None,
 ) -> List[Dict[str, Any]]:
     """
     Generate Stage 2 timeline in chunks: calls, emails, CRM notes.
     Returns merged, sorted array of all events.
     """
     stage1_json_str = json.dumps(stage1_output)
+    limiter = external_limiter or _OutputTokenLimiter(_model_output_tpm())
 
     # Step 1: Generate call events
     call_events = await _stage_2_generate_calls(
-        stage1_json_str, config, deal_start_date, deal_end_date
+        stage1_json_str, config, deal_start_date, deal_end_date, limiter
     )
+    if progress_callback:
+        await progress_callback("stage2_calls", "Generated call events", 27)
 
     # Step 2: Generate email events (passes calls as context)
     email_events = await _stage_2_generate_emails(
-        stage1_json_str, config, deal_start_date, deal_end_date, call_events
+        stage1_json_str, config, deal_start_date, deal_end_date, call_events, limiter
     )
+    if progress_callback:
+        await progress_callback("stage2_emails", "Generated email events", 30)
 
     # Step 3: Generate CRM note events (passes calls + emails as context)
     crm_events = await _stage_2_generate_crm_notes(
-        stage1_json_str, config, deal_start_date, deal_end_date, call_events, email_events
+        stage1_json_str, config, deal_start_date, deal_end_date, call_events, email_events, limiter
     )
+    if progress_callback:
+        await progress_callback("stage2_crm", "Generated CRM note events", 33)
 
     # Step 4: Merge and sort
     all_events = call_events + email_events + crm_events
-    all_events.sort(key=lambda e: (e['date'], e['timestamp']))
+    all_events.sort(key=lambda e: (e.get('date', ''), e.get('timestamp', '')))
 
     return all_events
 
@@ -376,7 +393,8 @@ async def _stage_2_generate_calls(
     stage1_json: str,
     config: Dict[str, Any],
     deal_start_date: str,
-    deal_end_date: str
+    deal_end_date: str,
+    limiter: Optional[_OutputTokenLimiter] = None,
 ) -> List[Dict[str, Any]]:
     """Generate call events only."""
     prompt = STAGE_2_CALLS_PROMPT_TEMPLATE.format(
@@ -388,9 +406,11 @@ async def _stage_2_generate_calls(
         complexity=config['complexity'],
         is_series=config.get('is_series', False),
     )
-
-    response = await call_claude(prompt, MAX_TOKENS_BY_TYPE["stage2"])
-    return json.loads(response)
+    try:
+        response = await call_claude(prompt, MAX_TOKENS_BY_TYPE["stage2"], limiter)
+        return json.loads(response)
+    except (json.JSONDecodeError, ValueError) as e:
+        raise ValueError(f"Stage 2 calls chunk parse failed: {e}") from e
 
 
 async def _stage_2_generate_emails(
@@ -398,7 +418,8 @@ async def _stage_2_generate_emails(
     config: Dict[str, Any],
     deal_start_date: str,
     deal_end_date: str,
-    call_events: List[Dict[str, Any]]
+    call_events: List[Dict[str, Any]],
+    limiter: Optional[_OutputTokenLimiter] = None,
 ) -> List[Dict[str, Any]]:
     """Generate email events only, with call context."""
     prompt = STAGE_2_EMAILS_PROMPT_TEMPLATE.format(
@@ -409,9 +430,11 @@ async def _stage_2_generate_emails(
         emails_per_stage=config['emails_per_stage'],
         main_objection=config['main_objection'],
     )
-
-    response = await call_claude(prompt, MAX_TOKENS_BY_TYPE["stage2"])
-    return json.loads(response)
+    try:
+        response = await call_claude(prompt, MAX_TOKENS_BY_TYPE["stage2"], limiter)
+        return json.loads(response)
+    except (json.JSONDecodeError, ValueError) as e:
+        raise ValueError(f"Stage 2 emails chunk parse failed: {e}") from e
 
 
 async def _stage_2_generate_crm_notes(
@@ -420,7 +443,8 @@ async def _stage_2_generate_crm_notes(
     deal_start_date: str,
     deal_end_date: str,
     call_events: List[Dict[str, Any]],
-    email_events: List[Dict[str, Any]]
+    email_events: List[Dict[str, Any]],
+    limiter: Optional[_OutputTokenLimiter] = None,
 ) -> List[Dict[str, Any]]:
     """Generate CRM note events only, with call + email context."""
     prompt = STAGE_2_CRM_NOTES_PROMPT_TEMPLATE.format(
@@ -433,9 +457,11 @@ async def _stage_2_generate_crm_notes(
         complexity=config['complexity'],
         deal_outcome=config['deal_outcome'],
     )
-
-    response = await call_claude(prompt, MAX_TOKENS_BY_TYPE["stage2"])
-    return json.loads(response)
+    try:
+        response = await call_claude(prompt, MAX_TOKENS_BY_TYPE["stage2"], limiter)
+        return json.loads(response)
+    except (json.JSONDecodeError, ValueError) as e:
+        raise ValueError(f"Stage 2 CRM notes chunk parse failed: {e}") from e
 
 
 def build_prior_events_summary(events: List[Dict[str, Any]], current_event_index: int, max_prior: int = 7) -> str:

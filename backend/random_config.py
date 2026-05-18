@@ -122,8 +122,8 @@ _FREQUENCY_CALLS = {
 
 _FREQUENCY_EMAILS = {
     "daily": 5,
-    "weekly": 1,
-    "biweekly": 1,
+    "weekly": 3,
+    "biweekly": 2,
     "monthly": 1,
 }
 
@@ -134,6 +134,7 @@ def series_to_generate_config(series: dict) -> dict:
     num_calls = _FREQUENCY_CALLS[freq](months)
     emails_per_stage = _FREQUENCY_EMAILS[freq]
     num_stakeholders = min(2 + months // 2, 8)
+    decision_makers = series.get('number_of_decision_makers')
     return {
         'company_name': series.get('company_name'),
         'industry': series['industry'],
@@ -147,11 +148,24 @@ def series_to_generate_config(series: dict) -> dict:
         'buyer_urgency': series['buyer_urgency'],
         'num_calls': max(num_calls, 1),
         'emails_per_stage': emails_per_stage,
-        'num_stakeholders': num_stakeholders,
+        'num_stakeholders': decision_makers if decision_makers is not None else num_stakeholders,
         'complexity': series['complexity'],
         'ae_name': series.get('ae_name'),
         'se_name': series.get('se_name'),
         'business_use_case': series.get('business_use_case'),
         'is_series': True,
         'cs_scenario': series.get('cs_scenario'),
+        'sales_cycle_velocity': series.get('sales_cycle_velocity'),
+        'procurement_delay_days': series.get('procurement_delay_days'),
+        'eval_iteration_count': series.get('eval_iteration_count'),
+        'number_of_decision_makers': decision_makers,
+        'champion_replacement': series.get('champion_replacement', False),
+        'discount_percentage': series.get('discount_percentage'),
+        'win_loss_reason': series.get('win_loss_reason'),
+        'customer_company_size': series.get('customer_company_size'),
+        'budget_pre_allocated': series.get('budget_pre_allocated', False),
+        'competing_vendors': series.get('competing_vendors'),
+        'time_to_value_days': series.get('time_to_value_days'),
+        'implementation_complexity': series.get('implementation_complexity'),
+        'expansion_potential': series.get('expansion_potential'),
     }
