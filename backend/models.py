@@ -73,6 +73,12 @@ class SupportCategoryEnum(str, Enum):
     BUG = "bug"
     USAGE = "usage"
 
+class SupportContactFrequencyEnum(str, Enum):
+    """Support interaction frequency."""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
 class RecordTypeEnum(str, Enum):
     """Timeline event record type."""
     CALL = "call"
@@ -122,7 +128,7 @@ class CSScenario(BaseModel):
     """Customer success post-close scenario configuration."""
     enabled: bool = Field(False, description="Whether to generate post-close support events")
     adoption_challenge: Optional[AdoptionChallengeEnum] = Field(None, description="Primary adoption challenge")
-    support_contact_frequency: str = Field("low", description="Support contact frequency (low|medium|high)")
+    support_contact_frequency: SupportContactFrequencyEnum = Field(SupportContactFrequencyEnum.LOW, description="Support interaction frequency")
     churn_probability: float = Field(0.5, ge=0.0, le=1.0, description="Probability of churn (0.0-1.0)")
     post_close_days: int = Field(30, ge=7, le=180, description="Days to generate post-close events (7-180)")
 
@@ -273,27 +279,27 @@ class CRMNoteEvent(BaseModel):
 
 class SupportTicketEvent(BaseModel):
     """Support ticket post-close event."""
-    record_type: str = "support_ticket"
+    record_type: str = "support_ticket"  # Fixed record type for this event
     id: str  # UUID
     timestamp: str  # ISO 8601
-    category: SupportCategoryEnum
-    priority: SupportPriorityEnum
-    subject: str
-    description: str
-    assigned_to: str
-    status: str
+    category: SupportCategoryEnum  # Support ticket category
+    priority: SupportPriorityEnum  # Ticket priority level
+    subject: str  # Ticket subject line
+    description: str  # Detailed ticket description
+    assigned_to: str  # Support agent assigned to ticket
+    status: str  # Ticket status (open, in_progress, resolved, closed, etc.)
 
 class SupportCallEvent(BaseModel):
     """Support call post-close event."""
-    record_type: str = "support_call"
+    record_type: str = "support_call"  # Fixed record type for this event
     id: str  # UUID
     timestamp: str  # ISO 8601
-    category: SupportCategoryEnum
-    priority: SupportPriorityEnum
-    duration_minutes: int
-    outcome: str
-    call_notes: str
-    support_agent: str
+    category: SupportCategoryEnum  # Support call category
+    priority: SupportPriorityEnum  # Call priority level
+    duration_minutes: int  # Call duration in minutes
+    outcome: str  # Call outcome (issue_resolved, escalated, etc.)
+    call_notes: str  # Detailed notes from the support call
+    support_agent: str  # Name of support agent who took the call
 
 # ============= Response Models =============
 

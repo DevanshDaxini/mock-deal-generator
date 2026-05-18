@@ -9,6 +9,7 @@ from backend.models import (
     AdoptionChallengeEnum,
     SupportPriorityEnum,
     SupportCategoryEnum,
+    SupportContactFrequencyEnum,
     # New CS Models
     CSScenario,
     SupportTicketEvent,
@@ -81,7 +82,7 @@ class TestCSScenario:
         scenario = CSScenario()
         assert scenario.enabled is False
         assert scenario.adoption_challenge is None
-        assert scenario.support_contact_frequency == "low"
+        assert scenario.support_contact_frequency == SupportContactFrequencyEnum.LOW
         assert scenario.churn_probability == 0.5
         assert scenario.post_close_days == 30
 
@@ -90,19 +91,19 @@ class TestCSScenario:
         scenario = CSScenario(
             enabled=True,
             adoption_challenge=AdoptionChallengeEnum.TRAINING_GAP,
-            support_contact_frequency="high",
+            support_contact_frequency=SupportContactFrequencyEnum.HIGH,
             churn_probability=0.8,
             post_close_days=60,
         )
         assert scenario.enabled is True
         assert scenario.adoption_challenge == AdoptionChallengeEnum.TRAINING_GAP
-        assert scenario.support_contact_frequency == "high"
+        assert scenario.support_contact_frequency == SupportContactFrequencyEnum.HIGH
         assert scenario.churn_probability == 0.8
         assert scenario.post_close_days == 60
 
     def test_cs_scenario_support_contact_frequency_values(self):
-        """Test support_contact_frequency accepts valid values."""
-        for freq in ["low", "medium", "high"]:
+        """Test support_contact_frequency accepts valid enum values."""
+        for freq in [SupportContactFrequencyEnum.LOW, SupportContactFrequencyEnum.MEDIUM, SupportContactFrequencyEnum.HIGH]:
             scenario = CSScenario(support_contact_frequency=freq)
             assert scenario.support_contact_frequency == freq
 
@@ -270,16 +271,16 @@ class TestDealMetadataCSFields:
 
         # Create minimal DealMetadata-like structure
         # Note: This tests the field exists and is optional
-        assert hasattr(DealMetadata, "__fields__")
-        fields = DealMetadata.__fields__
+        assert hasattr(DealMetadata, "model_fields")
+        fields = DealMetadata.model_fields
         assert "cs_scenario" in fields
         # Default should be None
         assert fields["cs_scenario"].default is None
 
     def test_deal_metadata_support_events_count(self):
         """Test support_events_count field in DealMetadata."""
-        assert hasattr(DealMetadata, "__fields__")
-        fields = DealMetadata.__fields__
+        assert hasattr(DealMetadata, "model_fields")
+        fields = DealMetadata.model_fields
         assert "support_events_count" in fields
         # Default should be 0
         assert fields["support_events_count"].default == 0
