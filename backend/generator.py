@@ -100,10 +100,35 @@ def _parse_claude_response(text: str) -> str:
         json.loads(response)
         return response
     except json.JSONDecodeError as parse_err:
-        # Claude sometimes uses backslash-newline as a line continuation inside JSON strings,
-        # which is an invalid escape sequence. Replace with a space.
-        fixed = response.replace("\\\n", " ")
-        fixed = fixed.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'")
+        import re
+        # Replace backslash followed by one or more newlines (invalid JSON line continuation)
+        fixed = re.sub(r’\\\n+’, ‘ ‘, response)
+        fixed = fixed.replace(“””, ‘”’).replace(“””, ‘”’).replace(“’”, “’”).replace(“’”, “’”)
+        # Escape bare newlines and control characters inside JSON string values
+        def _escape_string_contents(s: str) -> str:
+            result = []
+            in_string = False
+            escaped = False
+            for ch in s:
+                if escaped:
+                    result.append(ch)
+                    escaped = False
+                elif ch == ‘\\’:
+                    result.append(ch)
+                    escaped = True
+                elif ch == ‘”’:
+                    result.append(ch)
+                    in_string = not in_string
+                elif in_string and ch == ‘\n’:
+                    result.append(‘\\n’)
+                elif in_string and ch == ‘\r’:
+                    result.append(‘\\r’)
+                elif in_string and ch == ‘\t’:
+                    result.append(‘\\t’)
+                else:
+                    result.append(ch)
+            return ‘’.join(result)
+        fixed = _escape_string_contents(fixed)
         try:
             json.loads(fixed)
             return fixed
