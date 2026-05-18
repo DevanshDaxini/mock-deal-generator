@@ -57,7 +57,7 @@ async def generate_deal_stream(request: GenerateRequest):
            {type: "complete", deal_id, filename, deal} on success
            {type: "error", message} on failure
     """
-    config = request.dict()
+    config = request.model_dump()
     queue: asyncio.Queue = asyncio.Queue()
 
     async def run_generation():
@@ -119,7 +119,7 @@ async def generate_deal(request: GenerateRequest):
         logger.info(f"Generating deal for {request.industry}")
 
         # Convert request to dict for generator
-        config = request.dict()
+        config = request.model_dump()
 
         # Run 3-stage pipeline
         deal_result = await generate_complete_deal(config)

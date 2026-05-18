@@ -181,15 +181,15 @@ class TestSupportCallEvent:
             category=SupportCategoryEnum.ONBOARDING,
             priority=SupportPriorityEnum.MEDIUM,
             duration_minutes=30,
-            outcome="issue_resolved",
-            call_notes="User walked through onboarding process",
+            resolution="issue_resolved",
+            transcript="User walked through onboarding process",
             support_agent="Jane Smith",
         )
         assert event.record_type == "support_call"
         assert event.id == "call-456"
         assert event.category == SupportCategoryEnum.ONBOARDING
         assert event.duration_minutes == 30
-        assert event.outcome == "issue_resolved"
+        assert event.resolution == "issue_resolved"
 
     def test_support_call_event_record_type_default(self):
         """Test support_call record_type is set to 'support_call'."""
@@ -199,8 +199,8 @@ class TestSupportCallEvent:
             category=SupportCategoryEnum.ONBOARDING,
             priority=SupportPriorityEnum.MEDIUM,
             duration_minutes=30,
-            outcome="issue_resolved",
-            call_notes="Test",
+            resolution="issue_resolved",
+            transcript="Test",
             support_agent="Test",
         )
         assert event.record_type == "support_call"

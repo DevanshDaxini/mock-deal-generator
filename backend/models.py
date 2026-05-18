@@ -297,8 +297,8 @@ class SupportCallEvent(BaseModel):
     category: SupportCategoryEnum  # Support call category
     priority: SupportPriorityEnum  # Call priority level
     duration_minutes: int  # Call duration in minutes
-    outcome: str  # Call outcome (issue_resolved, escalated, etc.)
-    call_notes: str  # Detailed notes from the support call
+    resolution: str  # Call outcome (issue_resolved, escalated, etc.)
+    transcript: str  # Detailed notes from the support call
     support_agent: str  # Name of support agent who took the call
 
 # ============= Response Models =============

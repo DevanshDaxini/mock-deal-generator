@@ -96,7 +96,7 @@ def generate_random_config() -> dict:
         "num_stakeholders": num_stakeholders,
         "complexity": complexity,
         "cs_scenario": {
-            "enabled": True,
+            "enabled": outcome == "closed_won",
             "adoption_challenge": random.choice(ADOPTION_CHALLENGES),
             "support_contact_frequency": random.choice(SUPPORT_FREQUENCIES),
             "churn_probability": churn_probability,

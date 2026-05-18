@@ -6,6 +6,7 @@ Stage 3: Content generation (batched with concurrency limit)
 """
 
 import json
+import re
 import asyncio
 import time
 import uuid
@@ -100,10 +101,9 @@ def _parse_claude_response(text: str) -> str:
         json.loads(response)
         return response
     except json.JSONDecodeError as parse_err:
-        import re
         # Replace backslash followed by one or more newlines (invalid JSON line continuation)
-        fixed = re.sub(r’\\\n+’, ‘ ‘, response)
-        fixed = fixed.replace(“””, ‘”’).replace(“””, ‘”’).replace(“’”, “’”).replace(“’”, “’”)
+        fixed = re.sub(r'\\\n+', ' ', response)
+        fixed = fixed.replace('"', '"').replace('"', '"').replace(''', "'").replace(''', "'")
         # Escape bare newlines and control characters inside JSON string values
         def _escape_string_contents(s: str) -> str:
             result = []
@@ -113,21 +113,21 @@ def _parse_claude_response(text: str) -> str:
                 if escaped:
                     result.append(ch)
                     escaped = False
-                elif ch == ‘\\’:
+                elif ch == '\\':
                     result.append(ch)
                     escaped = True
-                elif ch == ‘”’:
+                elif ch == '"':
                     result.append(ch)
                     in_string = not in_string
-                elif in_string and ch == ‘\n’:
-                    result.append(‘\\n’)
-                elif in_string and ch == ‘\r’:
-                    result.append(‘\\r’)
-                elif in_string and ch == ‘\t’:
-                    result.append(‘\\t’)
+                elif in_string and ch == '\n':
+                    result.append('\\n')
+                elif in_string and ch == '\r':
+                    result.append('\\r')
+                elif in_string and ch == '\t':
+                    result.append('\\t')
                 else:
                     result.append(ch)
-            return ‘’.join(result)
+            return ''.join(result)
         fixed = _escape_string_contents(fixed)
         try:
             json.loads(fixed)
@@ -242,7 +242,6 @@ async def stage_1_generate_foundation(config: Dict[str, Any], deal_start_date: s
 
 async def generate_stage_1_cs_context(
     stage1_json: str,
-    cs_scenario,
     adoption_challenge: str,
     support_contact_frequency: str,
     churn_probability: float,
@@ -496,7 +495,7 @@ async def stage_3_generate_support_ticket_content(
     prompt = STAGE_3_SUPPORT_TICKET_PROMPT_TEMPLATE.format(
         company_name=stage1['company']['name'],
         industry=stage1['company']['industry'],
-        days_since_close=30,
+        days_since_close=event.get('days_since_close', 30),
         adoption_challenge=adoption_challenge,
         expected_churn_status=expected_churn_status,
         event_scaffold_json=json.dumps(event, indent=2),
@@ -635,7 +634,14 @@ async def generate_complete_deal(
     Run full 3-stage pipeline and return complete deal object.
     Optional progress_callback(step, message, pct) called at each stage.
     """
-    deal_end_date = datetime.now(timezone.utc).date()
+    cs_scenario_cfg = config.get('cs_scenario')
+    post_close_days = (
+        cs_scenario_cfg.get('post_close_days', 30)
+        if cs_scenario_cfg and cs_scenario_cfg.get('enabled')
+        else 0
+    )
+    # Shift close date back so CS period ends today rather than in the future
+    deal_end_date = datetime.now(timezone.utc).date() - timedelta(days=post_close_days)
     deal_start_date = deal_end_date - timedelta(days=config['sales_cycle_length_days'])
     deal_id = str(uuid.uuid4())
 
@@ -669,7 +675,6 @@ async def generate_complete_deal(
 
         cs_context = await generate_stage_1_cs_context(
             stage1_json=stage_1_json_str,
-            cs_scenario=cs_scenario,
             adoption_challenge=adoption_challenge_value or '',
             support_contact_frequency=support_contact_freq_value or 'low',
             churn_probability=cs_scenario.get('churn_probability', 0.5),
@@ -691,16 +696,11 @@ async def generate_complete_deal(
     if cs_context:
         stage_2_json_str = json.dumps(events_scaffold)
 
-        # CS dates (same as in Stage 1 context generation)
-        deal_close_date = str(deal_end_date)
-        cs_start = (datetime.fromisoformat(deal_close_date) + timedelta(days=1)).strftime("%Y-%m-%d")
-        cs_end = (datetime.fromisoformat(deal_close_date) + timedelta(days=cs_scenario.get('post_close_days', 30))).strftime("%Y-%m-%d")
-
         cs_events_scaffold = await generate_stage_2_cs_timeline(
             stage1_json=stage_1_json_str,
             stage2_json=stage_2_json_str,
             cs_context=cs_context,
-            support_contact_frequency=cs_scenario.get('support_contact_frequency', 'low'),
+            support_contact_frequency=support_contact_freq_value or 'low',
             churn_probability=cs_scenario.get('churn_probability', 0.5),
             deal_close_date=deal_close_date,
             cs_start_date=cs_start,
@@ -758,7 +758,7 @@ async def generate_complete_deal(
         'sentiment_arc': stage1['sentiment_arc'],
         'stage_progression': stage1['stage_progression'],
         'objections': stage1['objections'],
-        'cs_scenario': cs_scenario.model_dump() if cs_scenario and cs_scenario.get('enabled') else None,
+        'cs_scenario': cs_scenario if cs_scenario and cs_scenario.get('enabled') else None,
         'support_events_count': support_events_count,
     }
 
