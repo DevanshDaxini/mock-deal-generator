@@ -474,7 +474,6 @@ async def _stage_2_generate_calls(
     ]
 
     prompt = STAGE_2_CALLS_PROMPT_TEMPLATE.format(
-        stage1_json=stage1_json,
         deal_start_date=deal_start_date,
         deal_end_date=deal_end_date,
         num_calls=config['num_calls'],
@@ -512,7 +511,6 @@ async def _stage_2_generate_emails(
     ]
 
     prompt = STAGE_2_EMAILS_PROMPT_TEMPLATE.format(
-        stage1_json=stage1_json,
         call_events_json=json.dumps(call_events),
         deal_start_date=deal_start_date,
         deal_end_date=deal_end_date,
@@ -550,7 +548,6 @@ async def _stage_2_generate_crm_notes(
     ]
 
     prompt = STAGE_2_CRM_NOTES_PROMPT_TEMPLATE.format(
-        stage1_json=stage1_json,
         call_events_json=json.dumps(call_events),
         email_events_json=json.dumps(email_events),
         deal_start_date=deal_start_date,

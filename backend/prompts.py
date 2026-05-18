@@ -22,7 +22,9 @@ Ending Sentiment: {ending_sentiment}
 Champion Entry: {champion_entry}
 {company_name_line}
 {ae_name_line}
+{ae_profile_line}
 {se_name_line}
+{se_profile_line}
 {business_use_case_line}
 
 Return a single JSON object with this exact structure:
@@ -91,9 +93,15 @@ Rules:
 - If complexity is "messy": 5+ objections, some unresolved. At least one blocker. Include budget, security, and procurement objections.
 - If deal_outcome is "closed_lost": at least one objection must remain unresolved.
 - If ae_name is provided, use it as the sales_rep name exactly. Otherwise generate a realistic name.
+- If ae_experience is provided: junior = uncertain, relies on playbook, less objection recovery; mid = competent, consistent follow-through; senior = confident, shapes deal narrative, reframes objections.
+- If ae_style is provided: consultative = asks questions, educates, low-pressure; assertive = direct, timeline-focused, pushes for next steps; relationship_focused = builds rapport, references shared context, personal tone.
 - If se_name is provided, use it as the sales_engineer name exactly. Otherwise generate a realistic name.
+- If se_technical_depth is provided: shallow = high-level product overview only; competent = handles standard integration and security questions; deep = architects custom solutions, deep technical credibility.
+- If se_involvement is provided: light = SE appears at demo only; standard = demo + evaluation support; heavy = SE on all technical calls, co-owns the deal.
 - The sales_engineer must use the same vendor_company as sales_rep.
 - SE appears in demo and evaluation stage calls as a technical resource.
+- Use AE profile attributes (experience and style) to shape call transcript dialogue, email tone, objection responses, and CRM note observations.
+- Use SE profile attributes (technical depth and involvement) to shape demo quality, technical Q&A depth, and frequency of SE participation.
 - If business_use_case is provided, use it to shape objections, stakeholder archetypes, and deal narrative."""
 
 # ============= STAGE 1 CS: Customer Success Context =============
@@ -102,6 +110,46 @@ STAGE_1_CS_PROMPT_TEMPLATE = """Generate the post-close customer success context
 
 Deal Foundation:
 {stage1_json}
+
+CS Configuration:
+- Deal close date: {deal_close_date}
+- CS start date: {cs_start_date}
+- CS end date: {cs_end_date}
+- Adoption challenge: {adoption_challenge}
+- Support contact frequency: {support_contact_frequency}
+- Churn probability: {churn_probability}
+
+Return a single JSON object with this exact structure:
+{{
+  "cs_context": {{
+    "onboarding_start_date": "YYYY-MM-DD (1-2 days after deal_close_date, on or before cs_end_date)",
+    "initial_sentiment": "positive",
+    "primary_blocker": "string (specific blocker matching adoption_challenge, 5-10 words)",
+    "support_contact_initiator": "uuid4 or name string (person who first reaches out)",
+    "churn_date": "YYYY-MM-DD or null (if churn_probability >= 0.7, within cs_start_date to cs_end_date; else null)",
+    "key_adoption_risks": [
+      "string (specific, concrete risk, 5-10 words)",
+      "string (specific, concrete risk, 5-10 words)",
+      "string (specific, concrete risk, 5-10 words)",
+      "string (specific, concrete risk, 5-10 words)"
+    ],
+    "recommended_support_frequency": "integer (calls per month, 2-12 range)"
+  }}
+}}
+
+Rules:
+- onboarding_start_date must be 1-2 days after deal_close_date and on or before cs_end_date.
+- initial_sentiment must always be "positive".
+- primary_blocker must be specific and directly match the adoption_challenge.
+- support_contact_initiator can be a UUID of a support engineer or a realistic name string.
+- churn_date: if churn_probability >= 0.7, generate a date within cs_start_date to cs_end_date; otherwise set to null.
+- key_adoption_risks must have exactly 4 entries, each specific and tied to the adoption_challenge and company context.
+- recommended_support_frequency must reflect the support_contact_frequency parameter (low: 2-3, medium: 5-7, high: 10-12).
+- All text fields: use ONLY alphanumeric characters, spaces, hyphens, apostrophes, periods, and commas. NO quotes, NO ampersands, NO parentheses, NO slashes, NO newlines.
+
+Return only the JSON object, no other text."""
+
+STAGE_1_CS_USER_TEMPLATE = """Generate the post-close customer success context for this deal.
 
 CS Configuration:
 - Deal close date: {deal_close_date}
@@ -150,6 +198,55 @@ Deal Foundation:
 
 Sales Timeline:
 {stage2_json}
+
+CS Context:
+{cs_context_json}
+
+Timeline Configuration:
+- Deal close date: {deal_close_date}
+- CS start date: {cs_start_date}
+- CS end date: {cs_end_date}
+- Support contact frequency: {support_contact_frequency}
+- Churn probability: {churn_probability}
+- Churn date: {churn_date}
+
+Return a JSON array of support event scaffold objects. Each object must have these fields:
+
+For ALL event types:
+- "id": uuid4 string
+- "record_type": "support_ticket" | "support_call"
+- "date": "YYYY-MM-DD"
+- "timestamp": ISO 8601 (business hours '08:00-18:00', Monday-Friday only)
+- "sentiment": one of [positive, neutral, concerned, negative]
+- "days_since_close": integer (days between deal_close_date and event date)
+
+For "support_ticket" events additionally:
+- "ticket_type": one of [onboarding_issue, feature_request, bug_report, adoption_blocker, churn_risk, billing_issue]
+- "priority": "low" | "medium" | "high"
+- "description_preview": "string (10-15 word preview, non-detailed)"
+- "from_company": boolean (true if customer reported; false if support-initiated)
+
+For "support_call" events additionally:
+- "call_type": one of [onboarding, check_in, troubleshooting, escalation, executive_review]
+- "call_duration_minutes": integer (30-60)
+- "participants": array of {{ "name": string, "role": "support_engineer" | "customer_contact" }}
+
+Ordering and distribution rules:
+1. First event must be a support_call with call_type "onboarding" on onboarding_start_date (1-2 days after deal_close_date).
+2. All timestamps must fall within cs_start_date to cs_end_date, Monday-Friday, '08:00-18:00'.
+3. Distribute events based on support_contact_frequency:
+   - "low": 2-3 total interactions
+   - "medium": 5-7 total interactions
+   - "high": 8-12 total interactions
+4. Maintain 60% support_ticket, 40% support_call ratio across all events.
+5. If churn_date is not null: final event must be a support_call with call_type "escalation" on churn_date - 1 or churn_date - 2.
+6. Sentiment distribution: begin with "positive", shift toward "concerned" or "negative" if churn is expected; remain "positive"/"neutral" if healthy engagement.
+7. Events must be strictly chronologically ordered by timestamp.
+8. ticket_type and call_type must reflect actual CS activities (onboarding, adoption help, troubleshooting, churn mitigation).
+
+Return only the JSON array, no other text."""
+
+STAGE_2_CS_USER_TEMPLATE = """Generate a support event timeline scaffold for this customer success engagement.
 
 CS Context:
 {cs_context_json}
@@ -265,9 +362,6 @@ Return only the JSON object, no other text."""
 
 STAGE_2_CALLS_PROMPT_TEMPLATE = """Given this deal foundation, generate CALL EVENTS ONLY.
 
-Deal Foundation:
-{stage1_json}
-
 Configuration:
 - Deal start date: {deal_start_date}
 - Deal end date: {deal_end_date}
@@ -299,9 +393,6 @@ Rules:
 Return only JSON array, no other text."""
 
 STAGE_2_EMAILS_PROMPT_TEMPLATE = """Given this deal foundation and call schedule, generate EMAIL EVENTS ONLY.
-
-Deal Foundation:
-{stage1_json}
 
 Call Events (for reference):
 {call_events_json}
@@ -343,9 +434,6 @@ Rules:
 Return only JSON array, no other text."""
 
 STAGE_2_CRM_NOTES_PROMPT_TEMPLATE = """Given this deal foundation and existing events, generate CRM NOTE EVENTS ONLY.
-
-Deal Foundation:
-{stage1_json}
 
 Existing Events (calls + emails):
 - Calls: {call_events_json}
@@ -453,23 +541,14 @@ Return only the JSON array, no other text."""
 
 # ============= STAGE 3: Content Generation =============
 
-STAGE_3_CALL_PROMPT_TEMPLATE = """Generate the full content for this sales call.
+STAGE_3_CALL_PROMPT_TEMPLATE = """Generate content for this sales call. Deal context, stakeholders, and timeline are in the system prompt.
 
-Deal Context:
-- Company: {company_name} ({industry}, {deal_size})
-- Vendor: {vendor_company}
-- Sales Rep: {sales_rep_name}, {sales_rep_title}
-- Stage: {stage}
-- Complexity: {complexity}
-- Main Objection: {main_objection}
-- Current Sentiment: {sentiment}
-- Champion Status: {champion_context}
+Stage: {stage}
+Sentiment: {sentiment}
+Champion Status: {champion_context}
 
-Stakeholders on this call:
+Participants on this call:
 {participants_detail}
-
-All stakeholders in this deal:
-{all_stakeholders_summary}
 
 Call scaffold:
 {event_scaffold_json}
@@ -479,20 +558,17 @@ Prior interactions:
 
 Return a JSON object:
 {{
-  "transcript": "Multi-speaker transcript. Use 'Name: dialogue\\n' format per turn. 400-600 words. Reflect the call_type, sentiment, and stage accurately. Include realistic back-and-forth and follow-up questions. If the main objection is relevant, surface it explicitly. If a champion is present, show them supporting the deal.",
+  "transcript": "Multi-speaker transcript. Use 'Name: dialogue' format per turn. 400-600 words. Reflect the call_type, sentiment, and stage. Include realistic back-and-forth. If the main objection is relevant, surface it explicitly. If a champion is present, show them supporting the deal.",
   "summary": "2-3 sentences covering what was discussed and decided.",
   "objections_raised": ["verbatim short form of any objection raised in this call"],
   "next_steps": ["specific action item agreed on this call"]
 }}"""
 
-STAGE_3_EMAIL_PROMPT_TEMPLATE = """Generate the full content for this sales email.
+STAGE_3_EMAIL_PROMPT_TEMPLATE = """Generate content for this sales email. Deal context is in the system prompt.
 
-Deal Context:
-- Company: {company_name} ({industry})
-- Vendor: {vendor_company}
-- Stage: {stage}
-- Sentiment: {sentiment}
-- Purpose: {purpose}
+Stage: {stage}
+Sentiment: {sentiment}
+Purpose: {purpose}
 
 Email scaffold:
 {event_scaffold_json}
@@ -507,17 +583,13 @@ Return a JSON object:
   "body": "Email body. Professional but human and specific. No generic openers. Reference specific details from the deal context. Length: 100-200 words. Tone must match sentiment and purpose."
 }}"""
 
-STAGE_3_CRM_NOTE_PROMPT_TEMPLATE = """Generate the full content for this internal CRM note.
+STAGE_3_CRM_NOTE_PROMPT_TEMPLATE = """Generate content for this internal CRM note. Deal context is in the system prompt.
 
-Deal Context:
-- Company: {company_name}
-- Sales Rep: {sales_rep_name}
-- Stage: {stage}
-- Sentiment: {sentiment}
-
+Stage: {stage}
+Sentiment: {sentiment}
 Note trigger: {note_preview}
 
 Return a JSON object:
 {{
-  "content": "1 to 3 sentences. Blunt, factual, first-person sales-rep voice. No formatting or bullet points. Should read like something typed quickly into Salesforce. Examples: 'Champion aligned after demo. Marcus pushing procurement to accelerate.' / 'Security team blocked on SOC2. Need to loop in compliance ASAP.' / 'Procurement stalling. Budget freeze mentioned. Deal at risk.'"
+  "content": "1 to 3 sentences. Blunt, factual, first-person sales-rep voice. No formatting or bullet points. Should read like something typed quickly into Salesforce."
 }}"""
