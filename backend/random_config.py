@@ -2,6 +2,13 @@
 
 import random
 
+ADOPTION_CHALLENGES = [
+    "integration_complexity", "training_gap", "workflow_mismatch",
+    "performance_issues", "unclear_roi",
+]
+
+SUPPORT_FREQUENCIES = ["low", "medium", "high"]
+
 INDUSTRIES = [
     "Fintech", "Healthcare IT", "Cybersecurity", "DevTools", "HR Tech",
     "Legal Tech", "EdTech", "Supply Chain", "Real Estate Tech", "MarTech",
@@ -66,6 +73,13 @@ def generate_random_config() -> dict:
         num_stakeholders = random.randint(2, 4)
         sales_cycle = random.randint(14, 45)
 
+    # CS scenario: always enabled, weighted toward higher churn for lost deals
+    churn_probability = round(
+        random.uniform(0.6, 0.95) if outcome == "closed_lost"
+        else random.uniform(0.1, 0.6),
+        2
+    )
+
     return {
         "company_name": None,
         "industry": industry,
@@ -81,4 +95,11 @@ def generate_random_config() -> dict:
         "emails_per_stage": emails_per_stage,
         "num_stakeholders": num_stakeholders,
         "complexity": complexity,
+        "cs_scenario": {
+            "enabled": True,
+            "adoption_challenge": random.choice(ADOPTION_CHALLENGES),
+            "support_contact_frequency": random.choice(SUPPORT_FREQUENCIES),
+            "churn_probability": churn_probability,
+            "post_close_days": random.randint(14, 60),
+        },
     }
