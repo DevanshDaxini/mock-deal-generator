@@ -21,10 +21,11 @@ from models import (
     SuccessResponse,
     DealContent,
     BulkGenerateRequest,
+    SeriesRequest,
 )
 from generator import generate_complete_deal, _OutputTokenLimiter, _model_output_tpm
 from file_handler import write_deal, read_deal, list_deal_files, delete_deal, find_deal_file
-from random_config import generate_random_config
+from random_config import generate_random_config, series_to_generate_config
 
 # Load environment variables from .env
 load_dotenv()
@@ -104,6 +105,51 @@ async def generate_deal_stream(request: GenerateRequest):
             "X-Accel-Buffering": "no",
             "Connection": "keep-alive",
         }
+    )
+
+@app.post("/api/generate-series-stream")
+async def generate_series_stream(request: SeriesRequest):
+    """
+    POST /api/generate-series-stream
+    Convert series params to deal config, then generate with SSE progress.
+    Same SSE contract as /api/generate-stream.
+    """
+    config = series_to_generate_config(request.model_dump())
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def run_generation():
+        try:
+            async def progress_callback(step: str, message: str, progress: int):
+                await queue.put({"type": "progress", "step": step, "message": message, "progress": progress})
+
+            deal_result = await generate_complete_deal(config, progress_callback)
+            filename = await write_deal(
+                deal_result['deal_id'], deal_result['metadata'], deal_result['events']
+            )
+            deal_result['metadata']['filename'] = filename
+            await queue.put({
+                "type": "complete",
+                "deal_id": deal_result['deal_id'],
+                "filename": filename,
+                "deal": {"metadata": deal_result['metadata'], "events": deal_result['events']}
+            })
+        except Exception as e:
+            logger.error(f"Series generation failed: {str(e)}")
+            await queue.put({"type": "error", "message": str(e)})
+
+    asyncio.create_task(run_generation())
+
+    async def event_stream():
+        while True:
+            event = await queue.get()
+            yield f"data: {json.dumps(event)}\n\n"
+            if event["type"] in ("complete", "error"):
+                break
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"}
     )
 
 @app.post("/api/generate", response_model=GenerateResponse)
@@ -229,7 +275,7 @@ async def bulk_generate_stream(request: BulkGenerateRequest):
         failed = [0]
 
         async def generate_one(deal_number: int):
-            config = generate_random_config()
+            config = generate_random_config(request.overrides)
             await queue.put({"type": "deal_start", "deal_number": deal_number, "total": count})
             try:
                 async with sem:
