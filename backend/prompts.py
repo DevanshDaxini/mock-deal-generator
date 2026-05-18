@@ -94,7 +94,7 @@ Rules:
 - If se_name is provided, use it as the sales_engineer name exactly. Otherwise generate a realistic name.
 - The sales_engineer must use the same vendor_company as sales_rep.
 - SE appears in demo and evaluation stage calls as a technical resource.
-- If business_use_case is provided, use it to shape objections, stakeholder archetypes, and deal narrative.
+- If business_use_case is provided, use it to shape objections, stakeholder archetypes, and deal narrative."""
 
 # ============= STAGE 1 CS: Customer Success Context =============
 
@@ -168,7 +168,7 @@ For ALL event types:
 - "id": uuid4 string
 - "record_type": "support_ticket" | "support_call"
 - "date": "YYYY-MM-DD"
-- "timestamp": ISO 8601 (business hours 08:00-18:00, Monday-Friday only)
+- "timestamp": ISO 8601 (business hours '08:00-18:00', Monday-Friday only)
 - "sentiment": one of [positive, neutral, concerned, negative]
 - "days_since_close": integer (days between deal_close_date and event date)
 
@@ -185,7 +185,7 @@ For "support_call" events additionally:
 
 Ordering and distribution rules:
 1. First event must be a support_call with call_type "onboarding" on onboarding_start_date (1-2 days after deal_close_date).
-2. All timestamps must fall within cs_start_date to cs_end_date, Monday-Friday, 08:00-18:00.
+2. All timestamps must fall within cs_start_date to cs_end_date, Monday-Friday, '08:00-18:00'.
 3. Distribute events based on support_contact_frequency:
    - "low": 2-3 total interactions
    - "medium": 5-7 total interactions
@@ -323,7 +323,7 @@ Ordering and distribution rules:
    - "none": do not add any champion note
 8. If complexity is "messy": add CRM notes in Evaluation with note_preview containing "procurement delay", "budget concern", "timeline slippage", and "champion risk".
 9. If deal_outcome is "closed_lost": final event must be a CRM note with note_preview "Deal lost — [reason]".
-10. All timestamps must be weekdays between 08:00 and 18:00.
+10. All timestamps must be weekdays between '08:00' and '18:00'.
 11. Events must be strictly chronologically ordered.
 
 Return only the JSON array, no other text."""
