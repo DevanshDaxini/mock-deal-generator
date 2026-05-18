@@ -50,12 +50,37 @@ class ComplexityEnum(str, Enum):
     NORMAL = "normal"
     MESSY = "messy"
 
+class AdoptionChallengeEnum(str, Enum):
+    """Customer adoption challenges post-close."""
+    INTEGRATION_COMPLEXITY = "integration_complexity"
+    TRAINING_GAP = "training_gap"
+    WORKFLOW_MISMATCH = "workflow_mismatch"
+    PERFORMANCE_ISSUES = "performance_issues"
+    UNCLEAR_ROI = "unclear_roi"
+
+class SupportPriorityEnum(str, Enum):
+    """Support ticket and call priority levels."""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+class SupportCategoryEnum(str, Enum):
+    """Support interaction categories."""
+    ONBOARDING = "onboarding"
+    INTEGRATION = "integration"
+    FEATURE_REQUEST = "feature_request"
+    BUG = "bug"
+    USAGE = "usage"
+
 class RecordTypeEnum(str, Enum):
     """Timeline event record type."""
     CALL = "call"
     EMAIL = "email"
     CRM_NOTE = "crm_note"
     DEAL_METADATA = "deal_metadata"
+    SUPPORT_TICKET = "support_ticket"
+    SUPPORT_CALL = "support_call"
 
 class SupportLevelEnum(str, Enum):
     """Stakeholder support level."""
@@ -89,8 +114,18 @@ class GenerateRequest(BaseModel):
     emails_per_stage: int = Field(..., ge=1, le=5, description="Emails per stage")
     num_stakeholders: int = Field(..., ge=2, le=8, description="Number of stakeholders")
     complexity: ComplexityEnum = Field(..., description="Deal complexity")
+    cs_scenario: Optional['CSScenario'] = Field(None, description="Customer success post-close scenario")
 
 # ============= Internal Data Models =============
+
+class CSScenario(BaseModel):
+    """Customer success post-close scenario configuration."""
+    enabled: bool = Field(False, description="Whether to generate post-close support events")
+    adoption_challenge: Optional[AdoptionChallengeEnum] = Field(None, description="Primary adoption challenge")
+    support_contact_frequency: str = Field("low", description="Support contact frequency (low|medium|high)")
+    churn_probability: float = Field(0.5, ge=0.0, le=1.0, description="Probability of churn (0.0-1.0)")
+    post_close_days: int = Field(30, ge=7, le=180, description="Days to generate post-close events (7-180)")
+
 
 class Company(BaseModel):
     """Company profile."""
@@ -171,6 +206,8 @@ class DealMetadata(BaseModel):
     sentiment_arc: List[SentimentArcPoint]
     stage_progression: List[StageProgression]
     objections: List[Objection]
+    cs_scenario: Optional[CSScenario] = None
+    support_events_count: int = 0
 
 # ============= Timeline Event Models =============
 
@@ -233,6 +270,30 @@ class CRMNoteEvent(BaseModel):
     stage: str
     content: str
     is_internal: bool = True
+
+class SupportTicketEvent(BaseModel):
+    """Support ticket post-close event."""
+    record_type: str = "support_ticket"
+    id: str  # UUID
+    timestamp: str  # ISO 8601
+    category: SupportCategoryEnum
+    priority: SupportPriorityEnum
+    subject: str
+    description: str
+    assigned_to: str
+    status: str
+
+class SupportCallEvent(BaseModel):
+    """Support call post-close event."""
+    record_type: str = "support_call"
+    id: str  # UUID
+    timestamp: str  # ISO 8601
+    category: SupportCategoryEnum
+    priority: SupportPriorityEnum
+    duration_minutes: int
+    outcome: str
+    call_notes: str
+    support_agent: str
 
 # ============= Response Models =============
 
