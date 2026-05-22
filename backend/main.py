@@ -38,10 +38,16 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Add CORS middleware to allow frontend at http://localhost:5173 and 5174
+# CORS: allow all origins in production (Ycrest and frontend can be deployed anywhere).
+# Set ALLOWED_ORIGINS to a comma-separated list to restrict (e.g. "https://myapp.up.railway.app").
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
+_allow_all = _raw_origins.strip() == "*"
+_origins = ["*"] if _allow_all else [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174"],
+    allow_origins=_origins,
+    allow_credentials=not _allow_all,
     allow_methods=["*"],
     allow_headers=["*"],
 )
