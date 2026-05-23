@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import TimelineEvent from '../../components/TimelineEvent'
+import SlackView from './SlackView'
 
 const STAGE_NAMES = ['Prospecting', 'Discovery', 'Demo', 'Evaluation', 'Negotiation', 'Closed']
 
@@ -45,6 +46,7 @@ const TabBar = ({ activeTab, setActiveTab, hasCS }) => {
     }}>
       {tab('sales', 'Sales Timeline')}
       {tab('cs', 'CS Timeline')}
+      {tab('slack', 'Slack')}
     </div>
   )
 }
@@ -187,10 +189,9 @@ const DealTimeline = ({ deal }) => {
 
       <TabBar activeTab={activeTab} setActiveTab={setActiveTab} hasCS={hasCS} />
 
-      {activeTab === 'sales'
-        ? <SalesTimeline events={salesEvents} metadata={metadata} />
-        : <CSTimeline events={csEvents} metadata={metadata} />
-      }
+      {activeTab === 'sales' && <SalesTimeline events={salesEvents} metadata={metadata} />}
+      {activeTab === 'cs' && <CSTimeline events={csEvents} metadata={metadata} />}
+      {activeTab === 'slack' && <div style={{ marginTop: '24px' }}><SlackView deal={deal} /></div>}
     </div>
   )
 }
