@@ -637,7 +637,7 @@ def _build_slack_series_context(current_deal_idx: int, all_deals: List[Dict], re
     """Build cross-deal context for series Slack."""
     from models import SlackContext
 
-    other_deals = [f"- {d['company']['name']}: {d['metadata']['current_stage']}, ${d['metadata']['deal_size']}, {d['metadata']['outcome']}" for i, d in enumerate(all_deals) if i != current_deal_idx]
+    other_deals = [f"- {d['metadata']['company']['name']}: {d['metadata']['current_stage']}, ${d['metadata']['deal_size']}, {d['metadata']['outcome']}" for i, d in enumerate(all_deals) if i != current_deal_idx]
     other_deals_summary = "\n".join(other_deals) if other_deals else "No other active deals"
     won_count = sum(1 for d in all_deals if d["metadata"]["outcome"] == "Closed Won")
     at_risk_count = sum(1 for d in all_deals if d["metadata"]["complexity_mode"] == "Messy" or d["metadata"]["sentiment_arc"][-1] < 0.3)
