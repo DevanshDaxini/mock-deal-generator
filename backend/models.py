@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Literal
+from typing import Optional, List, Dict, Literal, Union
 from enum import Enum
 from datetime import datetime
 
@@ -382,6 +382,7 @@ class DealContent(BaseModel):
     """Deal object containing metadata and events."""
     metadata: DealMetadata
     events: List[dict]  # Union of CallEvent, EmailEvent, CRMNoteEvent
+    timeline_events: List[Union[CallEvent, EmailEvent, CRMNoteEvent, SlackEvent, SupportTicketEvent, SupportCallEvent]] = Field(default_factory=list, description="Timestamped timeline of all deal events including calls, emails, notes, Slack messages, and support interactions")
 
 class GenerateResponse(BaseModel):
     """POST /api/generate response."""
