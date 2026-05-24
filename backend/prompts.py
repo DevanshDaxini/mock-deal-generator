@@ -106,49 +106,6 @@ Rules:
 
 # ============= STAGE 1 CS: Customer Success Context =============
 
-STAGE_1_CS_PROMPT_TEMPLATE = """Generate the post-close customer success context for this deal.
-
-Deal Foundation:
-{stage1_json}
-
-CS Configuration:
-- Deal close date: {deal_close_date}
-- CS start date: {cs_start_date}
-- CS end date: {cs_end_date}
-- Adoption challenge: {adoption_challenge}
-- Support contact frequency: {support_contact_frequency}
-- Churn probability: {churn_probability}
-
-Return a single JSON object with this exact structure:
-{{
-  "cs_context": {{
-    "onboarding_start_date": "YYYY-MM-DD (1-2 days after deal_close_date, on or before cs_end_date)",
-    "initial_sentiment": "positive",
-    "primary_blocker": "string (specific blocker matching adoption_challenge, 5-10 words)",
-    "support_contact_initiator": "uuid4 or name string (person who first reaches out)",
-    "churn_date": "YYYY-MM-DD or null (if churn_probability >= 0.7, within cs_start_date to cs_end_date; else null)",
-    "key_adoption_risks": [
-      "string (specific, concrete risk, 5-10 words)",
-      "string (specific, concrete risk, 5-10 words)",
-      "string (specific, concrete risk, 5-10 words)",
-      "string (specific, concrete risk, 5-10 words)"
-    ],
-    "recommended_support_frequency": "integer (calls per month, 2-12 range)"
-  }}
-}}
-
-Rules:
-- onboarding_start_date must be 1-2 days after deal_close_date and on or before cs_end_date.
-- initial_sentiment must always be "positive".
-- primary_blocker must be specific and directly match the adoption_challenge.
-- support_contact_initiator can be a UUID of a support engineer or a realistic name string.
-- churn_date: if churn_probability >= 0.7, generate a date within cs_start_date to cs_end_date; otherwise set to null.
-- key_adoption_risks must have exactly 4 entries, each specific and tied to the adoption_challenge and company context.
-- recommended_support_frequency must reflect the support_contact_frequency parameter (low: 2-3, medium: 5-7, high: 10-12).
-- All text fields: use ONLY alphanumeric characters, spaces, hyphens, apostrophes, periods, and commas. NO quotes, NO ampersands, NO parentheses, NO slashes, NO newlines.
-
-Return only the JSON object, no other text."""
-
 STAGE_1_CS_USER_TEMPLATE = """Generate the post-close customer success context for this deal.
 
 CS Configuration:
@@ -640,13 +597,3 @@ Each message MUST have channel_id matching its channel.
 
 JSON array of SlackChannel objects: [{{"channel_id": "ch_uuid", "name": "deal-companyname", "topic": "", "is_shared": false, "created_at": "ISO", "messages": [{{"message_id": "msg_uuid", "channel_id": "ch_uuid", "sender": "AE", "sender_name": "Sarah Martinez", "body": "", "timestamp": "ISO", "reactions": [], "is_thread_reply": false, "thread_parent_id": null}}]}}]"""
 
-# ============= Token Budget Configuration =============
-
-MAX_TOKENS_BY_TYPE = {
-    "stage1": 3500,
-    "stage2": 8000,
-    "call": 2000,
-    "email": 800,
-    "crm_note": 350,
-    "slack": 2000,  # NEW: Slack channels + messages
-}
