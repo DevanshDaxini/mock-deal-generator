@@ -596,28 +596,49 @@ Return a JSON object:
 
 # ============= STAGE 3 Slack: Channel & Message Generation =============
 
-STAGE_3_SLACK_PROMPT_TEMPLATE = """Generate internal Slack for deal: {company_name} | {industry} | {deal_size} | {complexity_mode}
-Sentiment: {sentiment_arc} | Objections: {objections} | Outcome: {outcome}
+STAGE_3_SLACK_PROMPT_TEMPLATE = """Generate realistic internal sales team Slack messages for this deal.
+
+Deal: {company_name} | {industry} | {deal_size} | complexity={complexity_mode} | outcome={outcome}
+AE: {ae_name} | SE: {se_name}
+Objections: {objections}
 Timeline: {timeline_summary}
-Calls: {calls_summary} | Emails: {emails_summary}
+Calls: {calls_summary}
+Emails: {emails_summary}
 
-Rules:
-Channels: Simple=1 (#deal-X), Normal=1-2 (#deal-X, #at-risk if objections), Messy=2-3 (#deal-X, #at-risk, #escalations)
-Senders: AE, SDR, Manager, SE, Legal, CS. Tone: casual, emoji, real facts only (names, dates, objections).
-5-15 msgs/channel. Sentiment arc: optimistic→tense→celebration/postmortem. Champion entry=reaction. Win/loss=thread.
+Generate actual back-and-forth team conversations — NOT status updates. Messages must feel like real people talking:
+- AE posts something specific ("just got off the call, their security team pushed back hard on data residency"), Manager or SE replies ("expected — did you send the compliance docs yet?"), AE replies back
+- Threads form around key deal moments: after demo, when an objection surfaces, when a risk appears, at close
+- Senders react to each other, ask questions, give advice, express concern or excitement
+- Reference specific names, objections, and dates from the deal
+- Tone: casual, direct, no corporate speak. Short messages (1-3 sentences). No emoji.
 
-JSON: {{"channels": [{{"channel_id": "ch_uuid", "name": "", "topic": "", "is_shared": false, "created_at": "ISO", "messages": [{{"message_id": "msg_uuid", "sender": "", "body": "", "timestamp": "ISO", "reactions": [], "is_thread_reply": false, "thread_parent_id": null}}]}}]}}"""
+Channels: Simple=1 (#deal-companyname), Normal=1-2 (#deal-companyname + #at-risk if major objection), Messy=2-3
+sender MUST be ONLY ONE of: AE, SDR, Manager, SE, Legal, CS, Rep
+sender_name: use the real name for AE ({ae_name}) and SE ({se_name}). For Manager, SDR, CS, Legal invent a realistic full name.
+6-10 messages per channel. Use is_thread_reply=true and thread_parent_id to create reply chains under key messages.
+Each message MUST have channel_id matching its channel.
 
-STAGE_3_SLACK_SERIES_PROMPT_TEMPLATE = """Generate Slack for rep's quarter: {rep_name}
-Deal: {current_deal_name} | {current_deal_stage} | {current_deal_outcome}
-Other deals: {other_deals_summary}
+JSON array of SlackChannel objects: [{{"channel_id": "ch_uuid", "name": "deal-companyname", "topic": "", "is_shared": false, "created_at": "ISO", "messages": [{{"message_id": "msg_uuid", "channel_id": "ch_uuid", "sender": "AE", "sender_name": "Sarah Martinez", "body": "", "timestamp": "ISO", "reactions": [], "is_thread_reply": false, "thread_parent_id": null}}]}}]"""
+
+STAGE_3_SLACK_SERIES_PROMPT_TEMPLATE = """Generate realistic internal sales team Slack messages for this deal.
+
+Rep: {rep_name} | SE: {se_name} | Deal: {current_deal_name} | Stage: {current_deal_stage} | Outcome: {current_deal_outcome}
 Quarter health: {quarter_health}
 Timeline: {timeline_summary}
 
-Channels: #pipeline-[rep], #deals-at-risk (if needed), #deal-[name]
-Tone matches quarter health. 5-10 msgs in deal channel. Cross-deal refs in pipeline channel. Mark shared with is_shared: true.
+Generate actual back-and-forth team conversations — NOT status updates. Messages must feel like real people talking:
+- AE posts something specific about the deal, Manager or SE replies, others chime in
+- Threads form around key moments: risks, blockers, wins, close
+- Reference specific deal details, express real concern or excitement
+- Tone: casual, direct, short messages (1-3 sentences). No emoji.
 
-JSON: Same schema as single-deal."""
+Channels: #deal-[name] only. Do NOT generate pipeline or rep-level channels.
+sender MUST be ONLY ONE of: AE, SDR, Manager, SE, Legal, CS, Rep
+sender_name: use real name for AE ({rep_name}) and SE ({se_name}). For Manager, SDR, CS, Legal invent a realistic full name.
+6-10 messages in deal channel. Use is_thread_reply=true and thread_parent_id for reply chains.
+Each message MUST have channel_id matching its channel.
+
+JSON array of SlackChannel objects: [{{"channel_id": "ch_uuid", "name": "deal-companyname", "topic": "", "is_shared": false, "created_at": "ISO", "messages": [{{"message_id": "msg_uuid", "channel_id": "ch_uuid", "sender": "AE", "sender_name": "Sarah Martinez", "body": "", "timestamp": "ISO", "reactions": [], "is_thread_reply": false, "thread_parent_id": null}}]}}]"""
 
 # ============= Token Budget Configuration =============
 
