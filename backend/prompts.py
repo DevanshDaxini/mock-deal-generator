@@ -84,25 +84,17 @@ Return a single JSON object with this exact structure:
 }}
 
 Rules:
-- sentiment_arc must start at {starting_sentiment} and end at {ending_sentiment} with natural intermediate progression.
-- stage_progression dates must fall within {deal_start_date} to {deal_end_date}.
-- stakeholders must include exactly {num_stakeholders} people. Assign exactly one as is_champion: true only if champion_entry is not "none".
-- For all text fields (name, title, archetype, text): Use ONLY alphanumeric characters, spaces, hyphens, apostrophes, periods, and commas. NO quotes (straight or curly), NO ampersands, NO parentheses, NO slashes.
-- If complexity is "simple": 1-2 objections, all resolved. Mostly supporter/neutral stakeholders.
-- If complexity is "normal": 3-4 objections, most resolved. At least one skeptic.
-- If complexity is "messy": 5+ objections, some unresolved. At least one blocker. Include budget, security, and procurement objections.
-- If deal_outcome is "closed_lost": at least one objection must remain unresolved.
-- If ae_name is provided, use it as the sales_rep name exactly. Otherwise generate a realistic name.
-- If ae_experience is provided: junior = uncertain, relies on playbook, less objection recovery; mid = competent, consistent follow-through; senior = confident, shapes deal narrative, reframes objections.
-- If ae_style is provided: consultative = asks questions, educates, low-pressure; assertive = direct, timeline-focused, pushes for next steps; relationship_focused = builds rapport, references shared context, personal tone.
-- If se_name is provided, use it as the sales_engineer name exactly. Otherwise generate a realistic name.
-- If se_technical_depth is provided: shallow = high-level product overview only; competent = handles standard integration and security questions; deep = architects custom solutions, deep technical credibility.
-- If se_involvement is provided: light = SE appears at demo only; standard = demo + evaluation support; heavy = SE on all technical calls, co-owns the deal.
-- The sales_engineer must use the same vendor_company as sales_rep.
-- SE appears in demo and evaluation stage calls as a technical resource.
-- Use AE profile attributes (experience and style) to shape call transcript dialogue, email tone, objection responses, and CRM note observations.
-- Use SE profile attributes (technical depth and involvement) to shape demo quality, technical Q&A depth, and frequency of SE participation.
-- If business_use_case is provided, use it to shape objections, stakeholder archetypes, and deal narrative."""
+- sentiment_arc: start={starting_sentiment}, end={ending_sentiment}, natural progression.
+- stage_progression dates within {deal_start_date} to {deal_end_date}.
+- exactly {num_stakeholders} stakeholders. One is_champion: true unless champion_entry="none".
+- Text fields: alphanumeric, spaces, hyphens, apostrophes, periods, commas ONLY. No quotes, ampersands, parens, slashes.
+- simple: 1-2 objections all resolved, mostly supporters. normal: 3-4 objections mostly resolved, one skeptic. messy: 5+ objections some unresolved, one blocker, include budget/security/procurement.
+- closed_lost: at least one objection unresolved.
+- ae_name if provided: use exactly. ae_experience: junior=uncertain/playbook-reliant, mid=competent, senior=confident/reframes. ae_style: consultative=educates/low-pressure, assertive=direct/pushes next steps, relationship_focused=rapport/personal.
+- se_name if provided: use exactly. se_technical_depth: shallow=overview only, competent=standard Q&A, deep=custom solutions. se_involvement: light=demo only, standard=demo+eval, heavy=all calls.
+- sales_engineer uses same vendor_company as sales_rep. SE appears in demo and evaluation calls.
+- AE/SE profile shapes transcripts, emails, objection handling, CRM notes.
+- business_use_case if provided: shapes objections, stakeholder archetypes, deal narrative."""
 
 # ============= STAGE 1 CS: Customer Success Context =============
 
