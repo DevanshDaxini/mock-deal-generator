@@ -330,9 +330,10 @@ class SlackMessage(BaseModel):
     message_id: str  # UUID
     channel_id: str
     sender: Literal["AE", "SDR", "Manager", "SE", "Legal", "CS", "Rep"]
-    body: str  # Casual, may include emoji
+    sender_name: Optional[str] = None
+    body: str
     timestamp: datetime
-    reactions: Optional[List[str]] = None  # Emoji reactions
+    reactions: Optional[List[str]] = None
     is_thread_reply: bool = False
     thread_parent_id: Optional[str] = None
 
