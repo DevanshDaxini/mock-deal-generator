@@ -175,10 +175,10 @@ const DealTimeline = ({ deal }) => {
   const [activeTab, setActiveTab] = useState('sales')
 
   const { salesEvents, csEvents, slackEvents } = useMemo(() => ({
-    salesEvents: events.filter(e => !e.record_type?.startsWith('support')),
+    salesEvents: events.filter(e => !e.record_type?.startsWith('support') && !e.record_type?.startsWith('slack')),
     csEvents: events.filter(e => e.record_type?.startsWith('support')),
-    slackEvents: (deal.timeline_events || []).filter(e => e.record_type?.startsWith('slack')),
-  }), [events, deal.timeline_events])
+    slackEvents: events.filter(e => e.record_type?.startsWith('slack')),
+  }), [events])
 
   const hasCS = csEvents.length > 0
   const hasSlack = slackEvents.length > 0
