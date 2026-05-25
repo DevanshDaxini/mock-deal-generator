@@ -854,7 +854,6 @@ async def stage_3_generate_support_call_content(
 async def stage_3_generate_slack_content(
     deal_id: str,
     deal_data: Dict,
-    client: AsyncAnthropic,
     max_tokens: int = None,
     token_tracker: Optional['TokenTracker'] = None,
 ) -> List[Dict[str, Any]]:
@@ -903,13 +902,8 @@ async def stage_3_generate_slack_content(
         emails_summary=emails_summary,
     )
 
-    response = await client.messages.create(
-        model=MODEL,
-        max_tokens=max_tokens,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": prompt}]
-    )
-    slack_data = json.loads(_parse_claude_response(response.content[0].text))
+    text = await call_claude(prompt, max_tokens, stage="stage3_slack", token_tracker=token_tracker)
+    slack_data = json.loads(text)
     channels = slack_data if isinstance(slack_data, list) else slack_data.get("channels", [])
 
     slack_events = []
@@ -938,7 +932,6 @@ async def stage_3_generate_slack_content_series(
     deal_id: str,
     deal_data: Dict,
     series_context: 'SlackContext',
-    client: AsyncAnthropic,
     max_tokens: int = None,
     token_tracker: Optional['TokenTracker'] = None,
 ) -> List[Dict[str, Any]]:
@@ -966,13 +959,8 @@ async def stage_3_generate_slack_content_series(
         timeline_summary=timeline_summary
     )
 
-    response = await client.messages.create(
-        model=MODEL,
-        max_tokens=max_tokens,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": prompt}]
-    )
-    slack_data = json.loads(_parse_claude_response(response.content[0].text))
+    text = await call_claude(prompt, max_tokens, stage="stage3_slack_series", token_tracker=token_tracker)
+    slack_data = json.loads(text)
     channels = slack_data if isinstance(slack_data, list) else slack_data.get("channels", [])
 
     slack_events = []
@@ -1206,14 +1194,12 @@ async def generate_complete_deal(
                 deal_id=deal_id,
                 deal_data=deal_data,
                 series_context=series_context,
-                client=client,
                 token_tracker=token_tracker,
             )
         else:
             slack_events = await stage_3_generate_slack_content(
                 deal_id=deal_id,
                 deal_data=deal_data,
-                client=client,
                 token_tracker=token_tracker,
             )
         events = _insert_slack_events_into_timeline(events, slack_events)
