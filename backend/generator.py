@@ -1007,7 +1007,7 @@ async def stage_3_generate_all_content(
     Pass external_limiter to share a single budget across concurrent deals.
     """
     system_blocks = build_cached_system_blocks(stage1, config, events, use_ephemeral=False)
-    semaphore = asyncio.Semaphore(5)
+    semaphore = asyncio.Semaphore(2)
     limiter = external_limiter or _OutputTokenLimiter(_model_output_tpm())
     total = len(events)
     completed_count = [0]
