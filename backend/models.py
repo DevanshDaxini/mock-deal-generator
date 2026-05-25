@@ -346,21 +346,6 @@ class SlackChannel(BaseModel):
     created_at: datetime
     messages: List[SlackMessage] = Field(default_factory=list)
 
-class SlackEvent(BaseModel):
-    """Slack timeline event."""
-    record_type: Literal["slack_channel", "slack_message"]
-    channel: Optional[SlackChannel] = None
-    message: Optional[SlackMessage] = None
-    timestamp: datetime
-    stage: str  # Sales stage
-
-class SlackContext(BaseModel):
-    """Slack context for series mode."""
-    rep_name: str
-    shared_channels: List[str]
-    other_deals_summary: str
-    quarter_health: str
-
 # ============= Response Models =============
 
 class DealSummary(BaseModel):
@@ -383,7 +368,6 @@ class DealContent(BaseModel):
     """Deal object containing metadata and events."""
     metadata: DealMetadata
     events: List[dict]  # Union of CallEvent, EmailEvent, CRMNoteEvent
-    timeline_events: List[Union[CallEvent, EmailEvent, CRMNoteEvent, SlackEvent, SupportTicketEvent, SupportCallEvent]] = Field(default_factory=list, description="Timestamped timeline of all deal events including calls, emails, notes, Slack messages, and support interactions")
 
 class GenerateResponse(BaseModel):
     """POST /api/generate response."""

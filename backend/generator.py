@@ -854,7 +854,7 @@ async def stage_3_generate_slack_content(
     token_tracker: Optional['TokenTracker'] = None,
 ) -> List[Dict[str, Any]]:
     """Generate Slack channels and messages for single/bulk deals."""
-    from models import SlackEvent, SlackChannel, SlackMessage
+    from models import SlackChannel, SlackMessage
 
     if max_tokens is None:
         max_tokens = MAX_TOKENS_BY_TYPE["stage3_slack"]
