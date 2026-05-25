@@ -153,6 +153,7 @@ def series_to_generate_config(series: dict) -> dict:
         'ae_name': series.get('ae_name'),
         'se_name': series.get('se_name'),
         'business_use_case': series.get('business_use_case'),
+        'vendor_company': series.get('vendor_company'),
         'is_series': True,
         'cs_scenario': series.get('cs_scenario'),
         'sales_cycle_velocity': series.get('sales_cycle_velocity'),

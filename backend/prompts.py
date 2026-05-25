@@ -26,6 +26,7 @@ Champion Entry: {champion_entry}
 {se_name_line}
 {se_profile_line}
 {business_use_case_line}
+{vendor_company_line}
 
 Return a single JSON object with this exact structure:
 {{
@@ -94,7 +95,8 @@ Rules:
 - se_name if provided: use exactly. se_technical_depth: shallow=overview only, competent=standard Q&A, deep=custom solutions. se_involvement: light=demo only, standard=demo+eval, heavy=all calls.
 - sales_engineer uses same vendor_company as sales_rep. SE appears in demo and evaluation calls.
 - AE/SE profile shapes transcripts, emails, objection handling, CRM notes.
-- business_use_case if provided: shapes objections, stakeholder archetypes, deal narrative."""
+- business_use_case if provided: shapes objections, stakeholder archetypes, deal narrative.
+- vendor_company if provided: use exactly for sales_rep AND sales_engineer vendor_company AND email domain (firstname.lastname@vendorcompany.com, lowercase, no spaces). Otherwise generate fictional SaaS vendor name."""
 
 # ============= STAGE 1 CS: Customer Success Context =============
 
