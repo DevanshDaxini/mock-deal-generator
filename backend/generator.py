@@ -334,6 +334,8 @@ async def stage_1_generate_foundation(
 
     business_use_case_line = f"Business Use Case: {config.get('business_use_case')}" if config.get('business_use_case') else ""
 
+    vendor_company_line = f"Vendor Company: {config.get('vendor_company')}" if config.get('vendor_company') else ""
+
     prompt = STAGE_1_PROMPT_TEMPLATE.format(
         industry=config['industry'],
         deal_size=config['deal_size'],
@@ -354,6 +356,7 @@ async def stage_1_generate_foundation(
         se_name_line=se_name_line,
         se_profile_line=se_profile_line,
         business_use_case_line=business_use_case_line,
+        vendor_company_line=vendor_company_line,
     )
 
     response = await call_claude(prompt, MAX_TOKENS_BY_TYPE["stage1"], stage="stage1", token_tracker=token_tracker)

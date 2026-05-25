@@ -124,6 +124,7 @@ class GenerateRequest(BaseModel):
     ae_name: Optional[str] = Field(None, description="Account Executive name or null to auto-generate")
     se_name: Optional[str] = Field(None, description="Sales Engineer name or null to auto-generate")
     business_use_case: Optional[str] = Field(None, description="Business use case (e.g. 'Automate compliance reporting')")
+    vendor_company: Optional[str] = Field(None, description="Seller company name (where the AE works); auto-generated if null")
     is_series: bool = Field(False, description="Whether this is a series deal starting from cold call")
 
 # ============= Internal Data Models =============
@@ -375,6 +376,7 @@ class SeriesRequest(BaseModel):
     se_name: Optional[str] = Field(None, description="Sales Engineer name")
     business_use_case: str = Field(..., description="Business use case for this deal")
     company_name: Optional[str] = Field(None)
+    vendor_company: Optional[str] = Field(None, description="Seller company name (where the AE works); auto-generated if null")
     industry: str = Field(...)
     deal_size: str = Field(...)
     deal_outcome: DealOutcomeEnum = Field(..., description="Deal outcome (closed_won or closed_lost)")

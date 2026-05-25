@@ -26,6 +26,7 @@ Champion Entry: {champion_entry}
 {se_name_line}
 {se_profile_line}
 {business_use_case_line}
+{vendor_company_line}
 
 Return a single JSON object with this exact structure:
 {{
@@ -102,7 +103,8 @@ Rules:
 - SE appears in demo and evaluation stage calls as a technical resource.
 - Use AE profile attributes (experience and style) to shape call transcript dialogue, email tone, objection responses, and CRM note observations.
 - Use SE profile attributes (technical depth and involvement) to shape demo quality, technical Q&A depth, and frequency of SE participation.
-- If business_use_case is provided, use it to shape objections, stakeholder archetypes, and deal narrative."""
+- If business_use_case is provided, use it to shape objections, stakeholder archetypes, and deal narrative.
+- If Vendor Company is provided, use it exactly as the sales_rep.vendor_company AND sales_engineer.vendor_company. Also use it as the domain in sales_rep.email and sales_engineer.email (e.g. firstname.lastname@vendorcompany.com — lowercase, strip spaces). Otherwise, generate a fictional SaaS vendor name."""
 
 # ============= STAGE 1 CS: Customer Success Context =============
 
