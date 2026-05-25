@@ -4,7 +4,10 @@ export const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8
 
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 120000
+  timeout: 120000,
+  headers: {
+    'X-API-Key': import.meta.env.VITE_API_KEY || ''
+  }
 })
 
 export const dealApi = {
