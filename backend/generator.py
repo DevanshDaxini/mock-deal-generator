@@ -152,7 +152,7 @@ def _parse_claude_response(text: str) -> str:
         except Exception:
             with open("/tmp/claude_response.json", "w") as f:
                 f.write(response)
-            raise Exception(f"Claude response is not valid JSON: {str(parse_err)}\n\nFull response saved to /tmp/claude_response.json")
+            raise ValueError(f"Claude response is not valid JSON: {str(parse_err)}\n\nFull response saved to /tmp/claude_response.json")
 
 
 async def _call_with_retry(
@@ -871,7 +871,11 @@ async def stage_3_generate_slack_content(
     emails_summary = "\n".join([f"- {e.get('date')}: {e.get('subject', 'Email')}" for e in emails[:5]])
 
     # Extract stage names from stage progression dicts
-    stage_progression = deal_data.get('metadata', {}).get('stage_progression', [])
+    metadata = deal_data.get("metadata", {})
+    config = metadata.get("config", {})
+    company = metadata.get("company", {})
+
+    stage_progression = metadata.get('stage_progression', [])
     if stage_progression and isinstance(stage_progression[0], dict):
         stage_names = [s.get('stage', '') for s in stage_progression]
     else:
@@ -879,23 +883,23 @@ async def stage_3_generate_slack_content(
     timeline_summary = f"Stage progression: {' → '.join(stage_names)}"
 
     # Extract objection texts from objection dicts
-    objections_list = deal_data["metadata"].get("objections", [])
+    objections_list = metadata.get("objections", [])
     if objections_list and isinstance(objections_list[0], dict):
         objections_str = ", ".join([obj.get("text", "") for obj in objections_list]) or "None"
     else:
         objections_str = ", ".join(objections_list) if objections_list else "None"
 
-    ae_name = deal_data["metadata"].get("sales_rep", {}).get("name", "AE")
-    se_name = deal_data["metadata"].get("sales_engineer", {}).get("name", "SE") if deal_data["metadata"].get("sales_engineer") else "SE"
+    ae_name = metadata.get("sales_rep", {}).get("name", "AE")
+    se_name = metadata.get("sales_engineer", {}).get("name", "SE") if metadata.get("sales_engineer") else "SE"
 
     prompt = STAGE_3_SLACK_PROMPT_TEMPLATE.format(
-        company_name=deal_data["metadata"]["company"]["name"],
-        industry=deal_data["metadata"]["config"]["industry"],
-        deal_size=deal_data["metadata"]["config"]["deal_size"],
-        complexity_mode=deal_data["metadata"]["config"]["complexity"],
-        sentiment_arc=json.dumps(deal_data["metadata"]["sentiment_arc"]),
+        company_name=company.get("name", "Unknown Company"),
+        industry=config.get("industry", "Technology"),
+        deal_size=config.get("deal_size", "Unknown"),
+        complexity_mode=config.get("complexity", "normal"),
+        sentiment_arc=json.dumps(metadata.get("sentiment_arc", [])),
         objections=objections_str,
-        outcome=deal_data["metadata"]["deal_outcome"],
+        outcome=metadata.get("deal_outcome", "closed_won"),
         ae_name=ae_name,
         se_name=se_name,
         timeline_summary=timeline_summary,
@@ -907,18 +911,33 @@ async def stage_3_generate_slack_content(
     slack_data = json.loads(text)
     channels = slack_data if isinstance(slack_data, list) else slack_data.get("channels", [])
 
+    from pydantic import ValidationError
+    from models import SlackMessage
+
     slack_events = []
     for channel in channels:
-        slack_channel = SlackChannel(**channel)
-        channel_dump = slack_channel.model_dump(mode='json')
-        ts = channel_dump.get("created_at", "2000-01-01T00:00:00")
-        slack_events.append({
-            "record_type": "slack_channel",
-            "channel": channel_dump,
-            "date": ts.split("T")[0] if "T" in str(ts) else str(ts)[:10],
-            "timestamp": ts,
-            "stage": deal_data.get("metadata", {}).get("current_stage", "Unknown")
-        })
+        valid_messages = []
+        for msg in channel.get("messages", []):
+            try:
+                SlackMessage(**msg)
+                valid_messages.append(msg)
+            except ValidationError as e:
+                logger.warning(f"Dropping invalid Slack message: {e}")
+        channel["messages"] = valid_messages
+
+        try:
+            slack_channel = SlackChannel(**channel)
+            channel_dump = slack_channel.model_dump(mode='json')
+            ts = channel_dump.get("created_at", "2000-01-01T00:00:00")
+            slack_events.append({
+                "record_type": "slack_channel",
+                "channel": channel_dump,
+                "date": ts.split("T")[0] if "T" in str(ts) else str(ts)[:10],
+                "timestamp": ts,
+                "stage": metadata.get("current_stage", "Unknown")
+            })
+        except ValidationError as e:
+            logger.warning(f"Dropping invalid Slack channel: {e}")
     return slack_events
 
 
@@ -942,14 +961,16 @@ async def stage_3_generate_slack_content_series(
     emails_summary = "\n".join([f"- {e.get('date')}: {e.get('subject', 'Email')}" for e in emails[:5]])
     timeline_summary = f"{calls_summary}\n{emails_summary}"
 
-    se_name = deal_data["metadata"].get("sales_engineer", {}).get("name", "SE") if deal_data["metadata"].get("sales_engineer") else "SE"
+    se_name = deal_data.get("metadata", {}).get("sales_engineer", {}).get("name", "SE") if deal_data.get("metadata", {}).get("sales_engineer") else "SE"
+    metadata = deal_data.get("metadata", {})
+    company = metadata.get("company", {})
 
     prompt = STAGE_3_SLACK_SERIES_PROMPT_TEMPLATE.format(
         rep_name=rep_name,
         se_name=se_name,
-        current_deal_name=deal_data["metadata"]["company"]["name"],
-        current_deal_stage=deal_data["metadata"]["current_stage"],
-        current_deal_outcome=deal_data["metadata"]["outcome"],
+        current_deal_name=company.get("name", "Unknown Company"),
+        current_deal_stage=metadata.get("current_stage", "Unknown"),
+        current_deal_outcome=metadata.get("outcome", "Unknown"),
         quarter_health=_slack_quarter_health(deal_data),
         timeline_summary=timeline_summary
     )
@@ -958,18 +979,33 @@ async def stage_3_generate_slack_content_series(
     slack_data = json.loads(text)
     channels = slack_data if isinstance(slack_data, list) else slack_data.get("channels", [])
 
+    from pydantic import ValidationError
+    from models import SlackMessage
+
     slack_events = []
     for channel in channels:
-        slack_channel = SlackChannel(**channel)
-        channel_dump = slack_channel.model_dump(mode='json')
-        ts = channel_dump.get("created_at", "2000-01-01T00:00:00")
-        slack_events.append({
-            "record_type": "slack_channel",
-            "channel": channel_dump,
-            "date": ts.split("T")[0] if "T" in str(ts) else str(ts)[:10],
-            "timestamp": ts,
-            "stage": deal_data.get("metadata", {}).get("current_stage", "Unknown")
-        })
+        valid_messages = []
+        for msg in channel.get("messages", []):
+            try:
+                SlackMessage(**msg)
+                valid_messages.append(msg)
+            except ValidationError as e:
+                logger.warning(f"Dropping invalid Slack message in series: {e}")
+        channel["messages"] = valid_messages
+
+        try:
+            slack_channel = SlackChannel(**channel)
+            channel_dump = slack_channel.model_dump(mode='json')
+            ts = channel_dump.get("created_at", "2000-01-01T00:00:00")
+            slack_events.append({
+                "record_type": "slack_channel",
+                "channel": channel_dump,
+                "date": ts.split("T")[0] if "T" in str(ts) else str(ts)[:10],
+                "timestamp": ts,
+                "stage": metadata.get("current_stage", "Unknown")
+            })
+        except ValidationError as e:
+            logger.warning(f"Dropping invalid Slack channel in series: {e}")
     return slack_events
 
 
@@ -1206,6 +1242,10 @@ async def generate_complete_deal(
         if progress_callback:
             await progress_callback("slack_generated", "Slack messages generated", 95)
     except Exception as slack_err:
+        import pydantic
+        import anthropic
+        if not isinstance(slack_err, (json.JSONDecodeError, pydantic.ValidationError, KeyError, ValueError, TypeError, anthropic.AnthropicError)):
+            raise
         logger.error("Slack generation failed, continuing without Slack events: %s", slack_err)
         slack_events = []
         if progress_callback:
