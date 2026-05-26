@@ -2,7 +2,7 @@ import React from 'react'
 import { render, screen } from '@testing-library/react'
 import DealTimeline from './DealTimeline'
 
-describe('DealTimeline - Internal Calls', () => {
+describe('DealTimeline - Internal Calls & Safety', () => {
   const mockMetadata = {
     stakeholders: [
       { id: 'stakeholder1', name: 'John Doe' },
@@ -98,8 +98,10 @@ describe('DealTimeline - Internal Calls', () => {
       metadata: mockMetadata
     }
 
-    const { container } = render(<DealTimeline deal={mockDeal} />)
-    expect(container).toBeInTheDocument()
+    render(<DealTimeline deal={mockDeal} />)
+    // Verify actual content rendered
+    expect(screen.getByText('Internal Meeting')).toBeInTheDocument()
+    expect(screen.getByText('Team Sync')).toBeInTheDocument()
   })
 
   // Test 22: Deal health rendering safety (null handling) - also applies to DealTimeline

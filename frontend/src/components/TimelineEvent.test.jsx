@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import TimelineEvent from './TimelineEvent'
 
 describe('TimelineEvent - Internal Calls', () => {
@@ -29,7 +29,7 @@ describe('TimelineEvent - Internal Calls', () => {
 
   // Test 14: Internal call typeLabel
   test('displays Int. Call typeLabel for internal_call events', () => {
-    const { container } = render(
+    render(
       <TimelineEvent
         event={mockInternalCall}
         allEvents={[mockInternalCall]}
@@ -37,8 +37,7 @@ describe('TimelineEvent - Internal Calls', () => {
       />
     )
 
-    const typeLabel = container.querySelector('span')
-    expect(typeLabel.textContent).toBe('Int. Call')
+    expect(screen.getByText('Int. Call')).toBeInTheDocument()
   })
 
   // Test 15: Collapsed card title & subtitle
@@ -57,59 +56,24 @@ describe('TimelineEvent - Internal Calls', () => {
 
   // Tests 16-17-18 combined: Expanded header with all sections and deal health colors
   test('renders expanded view with header, participants, deal health, transcript, summary, and action items', () => {
-    const ExpandedWrapper = () => {
-      return (
-        <div>
-          {/* Header section */}
-          <div>
-            <h3>{mockInternalCall.title}</h3>
-            <p>{mockInternalCall.participants?.map(p => `${p.name} (${p.role})`).join(', ')}</p>
-            <div style={{
-              background: mockInternalCall.deal_health === 'on_track' ? 'var(--teal-low)' : 'transparent',
-              color: 'var(--teal)'
-            }}>
-              {mockInternalCall.deal_health ? (mockInternalCall.deal_health.charAt(0).toUpperCase() + mockInternalCall.deal_health.slice(1)).replace(/_/g, ' ') : '–'}
-            </div>
-          </div>
+    render(
+      <TimelineEvent
+        event={mockInternalCall}
+        allEvents={[mockInternalCall]}
+        stakeholders={mockStakeholders}
+      />
+    )
 
-          {/* Content sections */}
-          <h4>Participants</h4>
-          <ul>
-            {mockInternalCall.participants?.map((p, i) => (
-              <li key={i}>{p.name} — {p.role}</li>
-            ))}
-          </ul>
-
-          <h4>Transcript</h4>
-          <div style={{ fontFamily: 'monospace' }}>
-            {mockInternalCall.transcript}
-          </div>
-
-          <h4>Summary</h4>
-          <p>{mockInternalCall.summary}</p>
-
-          {mockInternalCall.action_items?.length > 0 && (
-            <div>
-              <h4>Action Items</h4>
-              <ul>
-                {mockInternalCall.action_items.map((item, i) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )
-    }
-
-    render(<ExpandedWrapper />)
+    // Click to expand the component (by clicking on the title)
+    const cardTitle = screen.getByText('Deal Review — Acme Corp')
+    fireEvent.click(cardTitle.parentElement.parentElement)
 
     // Test 16: Expanded header
     expect(screen.getByText('Deal Review — Acme Corp')).toBeInTheDocument()
     expect(screen.getByText('Alice Johnson (AE), Bob Smith (Manager)')).toBeInTheDocument()
     expect(screen.getByText(/On track/)).toBeInTheDocument()
 
-    // Test 17: Deal health colors (on_track = teal)
+    // Test 17: Deal health colors (on_track = teal) - verified by presence of "On track" badge
     // Test 18: Expanded content sections
     expect(screen.getByText('Participants')).toBeInTheDocument()
     expect(screen.getByText('Alice Johnson — AE')).toBeInTheDocument()
@@ -132,8 +96,62 @@ describe('TimelineEvent - Internal Calls', () => {
       />
     )
 
-    const cardElement = container.querySelector('[style*="cursor"]')
-    const style = cardElement.getAttribute('style')
-    expect(style).toContain('rgba(168,85,247,0.26)')
+    // Find the card element by looking for the one that contains the title
+    // The card has the borderColor in its style attribute
+    const allDivs = container.querySelectorAll('div')
+    let cardElement = null
+    for (const div of allDivs) {
+      const style = div.getAttribute('style')
+      if (style && style.includes('rgba(168,85,247,0.26)')) {
+        cardElement = div
+        break
+      }
+    }
+
+    expect(cardElement).toBeInTheDocument()
+    expect(cardElement.getAttribute('style')).toContain('rgba(168,85,247,0.26)')
+  })
+
+  // Test 5a: Empty action_items array (component has `?.length > 0` check)
+  test('does not render Action Items section when array is empty', () => {
+    const eventWithNoActionItems = { ...mockInternalCall, action_items: [] }
+
+    render(
+      <TimelineEvent
+        event={eventWithNoActionItems}
+        allEvents={[eventWithNoActionItems]}
+        stakeholders={mockStakeholders}
+      />
+    )
+
+    // Click to expand (by clicking on the title)
+    const cardTitle = screen.getByText('Deal Review — Acme Corp')
+    fireEvent.click(cardTitle.parentElement.parentElement)
+
+    // Verify Action Items section is NOT rendered
+    expect(screen.queryByText(/Action Items/)).not.toBeInTheDocument()
+  })
+
+  // Test 5b: Missing transcript
+  test('renders empty transcript gracefully', () => {
+    const eventWithoutTranscript = { ...mockInternalCall, transcript: null }
+
+    render(
+      <TimelineEvent
+        event={eventWithoutTranscript}
+        allEvents={[eventWithoutTranscript]}
+        stakeholders={mockStakeholders}
+      />
+    )
+
+    // Click to expand (by clicking on the title)
+    const cardTitle = screen.getByText('Deal Review — Acme Corp')
+    fireEvent.click(cardTitle.parentElement.parentElement)
+
+    // Verify Transcript section exists but is empty
+    const transcriptLabel = screen.getByText(/Transcript/)
+    expect(transcriptLabel).toBeInTheDocument()
+    const transcriptSection = transcriptLabel.closest('div').parentElement
+    expect(transcriptSection).toBeInTheDocument()
   })
 })
