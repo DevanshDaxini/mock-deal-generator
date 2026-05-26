@@ -16,7 +16,6 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
     negative: { background: 'rgba(239,68,68,0.12)', color: '#f87171' },
   }
 
-  // Priority colors for support tickets
   const priorityStyles = {
     critical: { background: 'rgba(239,68,68,0.12)', color: '#f87171' },
     high: { background: 'rgba(239,68,68,0.12)', color: '#f87171' },
@@ -33,7 +32,7 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
   const sentimentKey = normalizeSentiment(event.sentiment)
   const sentimentLabel = sentimentKey.charAt(0).toUpperCase() + sentimentKey.slice(1)
 
-  const typeLabel = { call: 'Call', email: 'Email', crm_note: 'Note', support_ticket: 'Ticket', support_call: 'Support' }[event.record_type] || '–'
+  const typeLabel = { call: 'Call', email: 'Email', crm_note: 'Note', support_ticket: 'Ticket', support_call: 'Support', internal_call: 'Int. Call' }[event.record_type] || '–'
 
   const supportCallTitle = (() => {
     const customer = event.participants?.find(p => p.role === 'customer_contact')
@@ -46,12 +45,14 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
 
   const fmt = s => s?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || '–'
 
-  // Determine styling based on event type
   const isSupport = event.record_type === 'support_ticket' || event.record_type === 'support_call'
+  const isInternal = event.record_type === 'internal_call'
   const supportEventStyle = event.record_type === 'support_ticket'
     ? { borderColor: 'rgba(59,130,246,0.26)', background: 'var(--surface)' }
     : event.record_type === 'support_call'
     ? { borderColor: 'rgba(34,197,94,0.26)', background: 'var(--surface)' }
+    : event.record_type === 'internal_call'
+    ? { borderColor: 'rgba(168,85,247,0.26)', background: 'var(--surface)' }
     : {}
 
   const cardStyle = {
@@ -72,11 +73,15 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
         onMouseEnter={e => {
           e.currentTarget.style.borderColor = isSupport
             ? (event.record_type === 'support_ticket' ? 'rgba(59,130,246,0.5)' : 'rgba(34,197,94,0.5)')
+            : isInternal
+            ? 'rgba(168,85,247,0.5)'
             : 'var(--teal-border)'
         }}
         onMouseLeave={e => {
           e.currentTarget.style.borderColor = isSupport
             ? (event.record_type === 'support_ticket' ? 'rgba(59,130,246,0.26)' : 'rgba(34,197,94,0.26)')
+            : isInternal
+            ? 'rgba(168,85,247,0.26)'
             : 'var(--rule)'
         }}
       >
@@ -88,7 +93,7 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px' }}>
               <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {event.record_type === 'call' ? event.title : event.record_type === 'email' ? event.subject : event.record_type === 'support_ticket' ? (event.description_preview || event.description) : event.record_type === 'support_call' ? supportCallTitle : 'CRM Note'}
+                {event.record_type === 'call' ? event.title : event.record_type === 'email' ? event.subject : event.record_type === 'support_ticket' ? (event.description_preview || event.description) : event.record_type === 'support_call' ? supportCallTitle : event.record_type === 'internal_call' ? event.title : event.content ? event.content.substring(0, 60) : 'CRM Note'}
               </span>
               {event.record_type === 'email' && event.sender?.name && (
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{event.sender.name}</span>
@@ -114,6 +119,8 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
                 ? fmt(event.ticket_type)
                 : event.record_type === 'support_call'
                 ? [supportEngineerName, event.call_duration_minutes ? `${event.call_duration_minutes} min` : null].filter(Boolean).join(' · ')
+                : event.record_type === 'internal_call'
+                ? event.participants?.map(p => p.name).join(', ')
                 : null}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>
@@ -131,7 +138,6 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
     )
   }
 
-  // Expanded
   return (
     <div
       onClick={() => setExpanded(false)}
@@ -139,18 +145,19 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
         ...cardStyle,
         borderColor: isSupport
           ? (event.record_type === 'support_ticket' ? 'rgba(59,130,246,0.4)' : 'rgba(34,197,94,0.4)')
+          : isInternal
+          ? 'rgba(168,85,247,0.4)'
           : 'var(--teal-border)',
         background: 'var(--surface-hi)'
       }}
     >
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '16px', paddingBottom: '14px', borderBottom: '1px solid var(--rule)' }}>
         <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', paddingTop: '2px', minWidth: '36px' }}>
           {typeLabel}
         </span>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {event.record_type === 'call' ? event.title : event.record_type === 'email' ? event.subject : event.record_type === 'support_ticket' ? (event.description_preview || event.description) : event.record_type === 'support_call' ? supportCallTitle : 'CRM Note'}
+            {event.record_type === 'call' ? event.title : event.record_type === 'email' ? event.subject : event.record_type === 'support_ticket' ? (event.description_preview || event.description) : event.record_type === 'support_call' ? supportCallTitle : event.record_type === 'internal_call' ? event.title : 'CRM Note'}
             {event.record_type === 'support_ticket' && event.ticket_id && (
               <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: '400' }}>
                 ({event.ticket_id})
@@ -162,6 +169,7 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
               : event.record_type === 'call' ? getStakeholderNames(event.participants?.map(p => p.stakeholder_id) || [])
               : event.record_type === 'support_ticket' ? [event.from_company ? 'Customer' : 'Internal', fmt(event.ticket_type)].join(' · ')
               : event.record_type === 'support_call' ? [supportEngineerName, event.call_duration_minutes ? `${event.call_duration_minutes} min` : null].filter(Boolean).join(' · ')
+              : event.record_type === 'internal_call' ? event.participants?.map(p => `${p.name} (${p.role})`).join(', ')
               : null}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>{formatDate(event.timestamp)}</div>
@@ -171,7 +179,6 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
         </span>
       </div>
 
-      {/* Call content */}
       {event.record_type === 'call' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
@@ -203,7 +210,6 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
         </div>
       )}
 
-      {/* Email content */}
       {event.record_type === 'email' && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--rule)', borderRadius: '6px', padding: '14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
@@ -218,16 +224,14 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
         </div>
       )}
 
-      {/* CRM Note content */}
       {event.record_type === 'crm_note' && (
         <div>
           <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Internal Note</div>
-          <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: '1.6', marginBottom: '10px' }}>{event.content}</p>
+          <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: '1.6', marginBottom: '10px' }}>{event.content || '(No content)'}</p>
           <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{event.author} · {formatDate(event.timestamp)}</div>
         </div>
       )}
 
-      {/* Support Ticket content */}
       {event.record_type === 'support_ticket' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
@@ -262,7 +266,6 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
         </div>
       )}
 
-      {/* Support Call content */}
       {event.record_type === 'support_call' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
@@ -300,6 +303,57 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
             <div>
               <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Resolution</div>
               <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: '1.6' }}>{event.resolution}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {event.record_type === 'internal_call' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Participants</div>
+            <ul style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {event.participants?.map((p, i) => (
+                <li key={i} style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>{p.name} — {p.role}</li>
+              ))}
+            </ul>
+          </div>
+          {event.deal_health && (
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Deal Health</div>
+              <span style={{
+                fontSize: '12px',
+                fontWeight: '600',
+                padding: '4px 10px',
+                borderRadius: '4px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                ...(event.deal_health === 'on_track' ? { background: 'rgba(34,197,94,0.12)', color: '#22c55e' } :
+                    event.deal_health === 'at_risk' ? { background: 'rgba(251,146,60,0.12)', color: '#fb923c' } :
+                    { background: 'rgba(239,68,68,0.12)', color: '#f87171' })
+              }}>
+                {fmt(event.deal_health)}
+              </span>
+            </div>
+          )}
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Transcript</div>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--rule)', borderRadius: '6px', padding: '12px', fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'monospace', whiteSpace: 'pre-wrap', maxHeight: '320px', overflowY: 'auto', lineHeight: '1.6' }}>
+              {event.transcript}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Summary</div>
+            <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: '1.6' }}>{event.summary}</p>
+          </div>
+          {event.action_items?.length > 0 && (
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Action Items</div>
+              <ul style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {event.action_items.map((item, i) => (
+                  <li key={i} style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>{item}</li>
+                ))}
+              </ul>
             </div>
           )}
         </div>
