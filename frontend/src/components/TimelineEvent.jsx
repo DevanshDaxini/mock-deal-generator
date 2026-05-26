@@ -111,6 +111,9 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
               {event.record_type === 'support_call' && supportEngineerName && (
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{supportEngineerName}</span>
               )}
+              {event.record_type === 'internal_call' && (
+                <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 6px', borderRadius: '3px', background: 'rgba(168,85,247,0.12)', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>Sales Team</span>
+              )}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
               {event.record_type === 'crm_note'
@@ -242,6 +245,11 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
       {/* Internal Call content */}
       {event.record_type === 'internal_call' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Internal Call banner */}
+          <div style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: '6px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>⚡ Internal Sales Team Call</span>
+          </div>
+
           {/* Participants section */}
           <div>
             <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Participants</div>
