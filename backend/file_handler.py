@@ -15,6 +15,24 @@ import aiofiles
 
 DEALS_DIR = "deals"
 
+def _parse_sort_ts(ts: Any) -> datetime:
+    """
+    Parse a timestamp to a tz-naive UTC datetime for consistent ordering.
+
+    Events come from mixed sources: sales events carry ISO strings, while Slack
+    channels are serialized from datetime fields and may include an explicit
+    offset (e.g. "...-05:00"). A raw string sort interleaves those incorrectly,
+    so normalize everything to UTC before comparing. Unparseable/missing values
+    sort to the epoch floor.
+    """
+    try:
+        dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+    except (ValueError, AttributeError, TypeError):
+        return datetime(2000, 1, 1)
+
 async def ensure_deals_dir_exists() -> None:
     """Create backend/deals directory if it doesn't exist."""
     Path(DEALS_DIR).mkdir(parents=True, exist_ok=True)
@@ -56,8 +74,9 @@ async def write_deal(deal_id: str, metadata: Dict[str, Any], events: List[Dict[s
     filename = generate_deal_filename(metadata['company']['name'], deal_id)
     filepath = os.path.join(DEALS_DIR, filename)
 
-    # Sort events by timestamp
-    sorted_events = sorted(events, key=lambda e: e['timestamp'])
+    # Sort events by timestamp (tz-aware; raw string sort interleaves Slack
+    # timestamps that carry an offset)
+    sorted_events = sorted(events, key=lambda e: _parse_sort_ts(e.get('timestamp', '')))
 
     try:
         async with aiofiles.open(filepath, 'w') as f:
@@ -104,8 +123,8 @@ async def read_deal(filepath: str) -> Dict[str, Any]:
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON in deal file {filepath}: {str(e)}")
 
-    # Sort events by timestamp ascending (oldest first)
-    events.sort(key=lambda e: e['timestamp'])
+    # Sort events by timestamp ascending (oldest first), tz-aware
+    events.sort(key=lambda e: _parse_sort_ts(e.get('timestamp', '')))
 
     return {
         'metadata': metadata,

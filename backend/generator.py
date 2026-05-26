@@ -910,7 +910,13 @@ async def stage_3_generate_slack_content(
 
     text = await call_claude(prompt, max_tokens, limiter=limiter, stage="stage3_slack", token_tracker=token_tracker)
     slack_data = json.loads(text)
-    channels = slack_data if isinstance(slack_data, list) else slack_data.get("channels", [])
+    if isinstance(slack_data, list):
+        channels = slack_data
+    elif isinstance(slack_data, dict):
+        channels = slack_data.get("channels", [])
+    else:
+        logger.warning("Slack response was not a list or object (got %s), skipping Slack", type(slack_data).__name__)
+        channels = []
 
     from models import SlackMessage
 
@@ -980,7 +986,13 @@ async def stage_3_generate_slack_content_series(
 
     text = await call_claude(prompt, max_tokens, limiter=limiter, stage="stage3_slack_series", token_tracker=token_tracker)
     slack_data = json.loads(text)
-    channels = slack_data if isinstance(slack_data, list) else slack_data.get("channels", [])
+    if isinstance(slack_data, list):
+        channels = slack_data
+    elif isinstance(slack_data, dict):
+        channels = slack_data.get("channels", [])
+    else:
+        logger.warning("Slack response was not a list or object (got %s), skipping Slack", type(slack_data).__name__)
+        channels = []
 
     from models import SlackMessage
 
