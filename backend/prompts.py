@@ -608,6 +608,7 @@ def _build_internal_calls_prompt(
             - prior_sentiment: str (positive|neutral|concerned|negative)
             - new_sentiment: str (positive|neutral|concerned|negative)
             - shift_severity: str (minor|moderate|major)
+            - stage: str (Prospecting|Discovery|Demo|Evaluation|Negotiation|Closed)
             - timestamp: str (ISO 8601)
         rep_context: optional dict with keys: rep_name, quarter_health (for series mode)
 
@@ -619,20 +620,27 @@ def _build_internal_calls_prompt(
 
     num_calls = len(transitions)
 
-    # Map sentiment to deal_health
-    sentiment_to_health = {
-        'positive': 'on_track',
-        'neutral': 'on_track',
-        'concerned': 'at_risk',
-        'negative': 'stalled'
-    }
+    def get_call_type(severity, stage):
+        """
+        Map shift severity to call type, with stage awareness for major shifts.
 
-    # Map shift_severity to call_type
-    severity_to_calltype = {
-        'minor': 'deal_review',
-        'moderate': 'strategy_session',
-        'major': 'war_room'
-    }
+        Args:
+            severity: str (minor|moderate|major)
+            stage: str (deal stage)
+
+        Returns:
+            str: call type (deal_review|strategy_session|war_room|close_plan_session)
+        """
+        if severity == 'major':
+            # Use close_plan_session for late-stage major shifts
+            if stage in ['Negotiation', 'Closed']:
+                return 'close_plan_session'
+            else:
+                return 'war_room'
+        elif severity == 'moderate':
+            return 'strategy_session'
+        else:  # minor
+            return 'deal_review'
 
     # Build transition reference section
     transitions_detail = ""
@@ -644,9 +652,11 @@ def _build_internal_calls_prompt(
             severity = trans.get('shift_severity', 'unknown')
             timestamp = trans.get('timestamp', 'unknown')
             trigger_idx = trans.get('trigger_call_index', i - 1)
+            stage = trans.get('stage', 'unknown')
+            call_type = get_call_type(severity, stage)
             transitions_detail += (
                 f"{i}. Call #{trigger_idx}: {prior.capitalize()} → {new.capitalize()} "
-                f"(severity: {severity}, at {timestamp})\n"
+                f"(severity: {severity}, stage: {stage}, call_type: {call_type}, at {timestamp})\n"
             )
 
     # Build deal outcome guardrail
@@ -686,10 +696,11 @@ Deal Context:
 - Deal Size: {deal_context.get('deal_size', 'Unknown')}
 - Deal Outcome: {deal_outcome}{buyer_calls_detail}{transitions_detail}
 
-Call Type Mapping (based on shift severity):
+Call Type Mapping (based on shift severity and stage):
 - minor shift → deal_review
 - moderate shift → strategy_session
-- major shift → war_room or close_plan_session
+- major shift in early/mid stages (Prospecting, Discovery, Demo, Evaluation) → war_room
+- major shift in late stages (Negotiation, Closed) → close_plan_session (for final deal replan or closure alignment)
 
 Deal Health Mapping (based on new sentiment):
 - positive sentiment → on_track
