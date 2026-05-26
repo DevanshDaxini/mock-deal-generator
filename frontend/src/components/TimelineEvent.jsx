@@ -16,6 +16,7 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
     negative: { background: 'rgba(239,68,68,0.12)', color: '#f87171' },
   }
 
+  // Priority colors for support tickets
   const priorityStyles = {
     critical: { background: 'rgba(239,68,68,0.12)', color: '#f87171' },
     high: { background: 'rgba(239,68,68,0.12)', color: '#f87171' },
@@ -45,8 +46,9 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
 
   const fmt = s => s?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || '–'
 
+  // Determine styling based on event type
   const isSupport = event.record_type === 'support_ticket' || event.record_type === 'support_call'
-  const isInternal = event.record_type === 'internal_call'
+  const isInternalCall = event.record_type === 'internal_call'
   const supportEventStyle = event.record_type === 'support_ticket'
     ? { borderColor: 'rgba(59,130,246,0.26)', background: 'var(--surface)' }
     : event.record_type === 'support_call'
@@ -73,14 +75,14 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
         onMouseEnter={e => {
           e.currentTarget.style.borderColor = isSupport
             ? (event.record_type === 'support_ticket' ? 'rgba(59,130,246,0.5)' : 'rgba(34,197,94,0.5)')
-            : isInternal
+            : isInternalCall
             ? 'rgba(168,85,247,0.5)'
             : 'var(--teal-border)'
         }}
         onMouseLeave={e => {
           e.currentTarget.style.borderColor = isSupport
             ? (event.record_type === 'support_ticket' ? 'rgba(59,130,246,0.26)' : 'rgba(34,197,94,0.26)')
-            : isInternal
+            : isInternalCall
             ? 'rgba(168,85,247,0.26)'
             : 'var(--rule)'
         }}
@@ -93,7 +95,7 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px' }}>
               <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {event.record_type === 'call' ? event.title : event.record_type === 'email' ? event.subject : event.record_type === 'support_ticket' ? (event.description_preview || event.description) : event.record_type === 'support_call' ? supportCallTitle : event.record_type === 'internal_call' ? event.title : event.content ? event.content.substring(0, 60) : 'CRM Note'}
+                {event.record_type === 'call' ? event.title : event.record_type === 'email' ? event.subject : event.record_type === 'support_ticket' ? (event.description_preview || event.description) : event.record_type === 'support_call' ? supportCallTitle : event.record_type === 'internal_call' ? event.title : 'CRM Note'}
               </span>
               {event.record_type === 'email' && event.sender?.name && (
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{event.sender.name}</span>
@@ -108,6 +110,9 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
               )}
               {event.record_type === 'support_call' && supportEngineerName && (
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{supportEngineerName}</span>
+              )}
+              {event.record_type === 'internal_call' && (
+                <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 6px', borderRadius: '3px', background: 'rgba(168,85,247,0.12)', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>Sales Team</span>
               )}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
@@ -138,6 +143,7 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
     )
   }
 
+  // Expanded
   return (
     <div
       onClick={() => setExpanded(false)}
@@ -145,12 +151,13 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
         ...cardStyle,
         borderColor: isSupport
           ? (event.record_type === 'support_ticket' ? 'rgba(59,130,246,0.4)' : 'rgba(34,197,94,0.4)')
-          : isInternal
+          : isInternalCall
           ? 'rgba(168,85,247,0.4)'
           : 'var(--teal-border)',
         background: 'var(--surface-hi)'
       }}
     >
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '16px', paddingBottom: '14px', borderBottom: '1px solid var(--rule)' }}>
         <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', paddingTop: '2px', minWidth: '36px' }}>
           {typeLabel}
@@ -179,8 +186,13 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
         </span>
       </div>
 
+      {/* Call content */}
       {event.record_type === 'call' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Buyer-Facing Call banner */}
+          <div style={{ background: 'var(--teal-low)', border: '1px solid var(--teal-border)', borderRadius: '6px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--teal)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Buyer-Facing Call</span>
+          </div>
           <div>
             <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Transcript</div>
             <div style={{ background: 'var(--surface)', border: '1px solid var(--rule)', borderRadius: '6px', padding: '12px', fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'monospace', whiteSpace: 'pre-wrap', maxHeight: '320px', overflowY: 'auto', lineHeight: '1.6' }}>
@@ -210,6 +222,7 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
         </div>
       )}
 
+      {/* Email content */}
       {event.record_type === 'email' && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--rule)', borderRadius: '6px', padding: '14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
@@ -224,16 +237,72 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
         </div>
       )}
 
+      {/* CRM Note content */}
       {event.record_type === 'crm_note' && (
         <div>
           <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Internal Note</div>
-          <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: '1.6', marginBottom: '10px' }}>{event.content || '(No content)'}</p>
+          <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: '1.6', marginBottom: '10px' }}>{event.content}</p>
           <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{event.author} · {formatDate(event.timestamp)}</div>
         </div>
       )}
 
+      {/* Internal Call content */}
+      {event.record_type === 'internal_call' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Internal Call banner */}
+          <div style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: '6px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Internal Sales Team Call</span>
+          </div>
+
+          {/* Participants section */}
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Participants</div>
+            <ul style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {event.participants?.map((p, i) => <li key={i} style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>{p.name} — {p.role}</li>)}
+            </ul>
+          </div>
+
+          {/* Deal health badge */}
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Deal Health</div>
+            <div style={{ display: 'inline-block', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', ...(event.deal_health === 'on_track' ? { background: 'var(--teal-low)', color: 'var(--teal)' } : event.deal_health === 'at_risk' ? { background: 'rgba(232,164,74,0.12)', color: 'var(--amber)' } : { background: 'rgba(239,68,68,0.12)', color: '#f87171' }) }}>
+              {event.deal_health ? (event.deal_health.charAt(0).toUpperCase() + event.deal_health.slice(1)).replace(/_/g, ' ') : '–'}
+            </div>
+          </div>
+
+          {/* Transcript */}
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Transcript</div>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--rule)', borderRadius: '6px', padding: '12px', fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'monospace', whiteSpace: 'pre-wrap', maxHeight: '320px', overflowY: 'auto', lineHeight: '1.6' }}>
+              {event.transcript}
+            </div>
+          </div>
+
+          {/* Summary */}
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Summary</div>
+            <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: '1.6' }}>{event.summary}</p>
+          </div>
+
+          {/* Action Items */}
+          {event.action_items?.length > 0 && (
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Action Items</div>
+              <ul style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {event.action_items.map((item, i) => <li key={i} style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>{item}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Support Ticket content */}
       {event.record_type === 'support_ticket' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Support Ticket banner */}
+          <div style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '6px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Support Ticket</span>
+          </div>
           <div>
             <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Details</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
@@ -266,8 +335,13 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
         </div>
       )}
 
+      {/* Support Call content */}
       {event.record_type === 'support_call' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Support Call banner */}
+          <div style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '6px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Post-Close Support Call</span>
+          </div>
           <div>
             <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Details</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
@@ -303,57 +377,6 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
             <div>
               <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Resolution</div>
               <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: '1.6' }}>{event.resolution}</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {event.record_type === 'internal_call' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div>
-            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Participants</div>
-            <ul style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {event.participants?.map((p, i) => (
-                <li key={i} style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>{p.name} — {p.role}</li>
-              ))}
-            </ul>
-          </div>
-          {event.deal_health && (
-            <div>
-              <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Deal Health</div>
-              <span style={{
-                fontSize: '12px',
-                fontWeight: '600',
-                padding: '4px 10px',
-                borderRadius: '4px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                ...(event.deal_health === 'on_track' ? { background: 'rgba(34,197,94,0.12)', color: '#22c55e' } :
-                    event.deal_health === 'at_risk' ? { background: 'rgba(251,146,60,0.12)', color: '#fb923c' } :
-                    { background: 'rgba(239,68,68,0.12)', color: '#f87171' })
-              }}>
-                {fmt(event.deal_health)}
-              </span>
-            </div>
-          )}
-          <div>
-            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Transcript</div>
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--rule)', borderRadius: '6px', padding: '12px', fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'monospace', whiteSpace: 'pre-wrap', maxHeight: '320px', overflowY: 'auto', lineHeight: '1.6' }}>
-              {event.transcript}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Summary</div>
-            <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: '1.6' }}>{event.summary}</p>
-          </div>
-          {event.action_items?.length > 0 && (
-            <div>
-              <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Action Items</div>
-              <ul style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {event.action_items.map((item, i) => (
-                  <li key={i} style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>{item}</li>
-                ))}
-              </ul>
             </div>
           )}
         </div>

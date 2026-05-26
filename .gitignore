@@ -47,6 +47,8 @@ frontend/dist/
 .pytest_cache/
 .coverage
 htmlcov/
+coverage/
+frontend/coverage/
 
 # Logs
 *.log
