@@ -189,6 +189,10 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
       {/* Call content */}
       {event.record_type === 'call' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Buyer-Facing Call banner */}
+          <div style={{ background: 'var(--teal-low)', border: '1px solid var(--teal-border)', borderRadius: '6px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--teal)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Buyer-Facing Call</span>
+          </div>
           <div>
             <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Transcript</div>
             <div style={{ background: 'var(--surface)', border: '1px solid var(--rule)', borderRadius: '6px', padding: '12px', fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'monospace', whiteSpace: 'pre-wrap', maxHeight: '320px', overflowY: 'auto', lineHeight: '1.6' }}>
@@ -247,7 +251,7 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Internal Call banner */}
           <div style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: '6px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>⚡ Internal Sales Team Call</span>
+            <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Internal Sales Team Call</span>
           </div>
 
           {/* Participants section */}
@@ -295,6 +299,10 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
       {/* Support Ticket content */}
       {event.record_type === 'support_ticket' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Support Ticket banner */}
+          <div style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '6px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Support Ticket</span>
+          </div>
           <div>
             <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Details</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
@@ -330,6 +338,10 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
       {/* Support Call content */}
       {event.record_type === 'support_call' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Support Call banner */}
+          <div style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '6px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Post-Close Support Call</span>
+          </div>
           <div>
             <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Details</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
