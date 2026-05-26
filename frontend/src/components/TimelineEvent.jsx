@@ -246,7 +246,7 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
           <div>
             <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Participants</div>
             <ul style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {event.participants.map((p, i) => <li key={i} style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>{p.name} — {p.role}</li>)}
+              {event.participants?.map((p, i) => <li key={i} style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>{p.name} — {p.role}</li>)}
             </ul>
           </div>
 
@@ -254,7 +254,7 @@ const TimelineEvent = ({ event, allEvents, stakeholders }) => {
           <div>
             <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Deal Health</div>
             <div style={{ display: 'inline-block', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', ...(event.deal_health === 'on_track' ? { background: 'var(--teal-low)', color: 'var(--teal)' } : event.deal_health === 'at_risk' ? { background: 'rgba(232,164,74,0.12)', color: 'var(--amber)' } : { background: 'rgba(239,68,68,0.12)', color: '#f87171' }) }}>
-              {event.deal_health?.charAt(0).toUpperCase() + event.deal_health?.slice(1)}
+              {event.deal_health ? (event.deal_health.charAt(0).toUpperCase() + event.deal_health.slice(1)).replace(/_/g, ' ') : '–'}
             </div>
           </div>
 
