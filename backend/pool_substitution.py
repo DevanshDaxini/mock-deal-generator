@@ -196,6 +196,9 @@ def substitute_deal(
     if industry:
         md["company"]["industry"] = industry
         md["config"]["industry"] = industry
+        # icp_type references the industry verbatim; rewrite so it doesn't
+        # claim a Mid-market HR Tech deal is actually InsurTech.
+        md["company"]["icp_type"] = f"Mid-market {industry}"
     if deal_size:
         md["config"]["deal_size"] = deal_size
 
