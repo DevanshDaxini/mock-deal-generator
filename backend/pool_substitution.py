@@ -100,30 +100,22 @@ def substitute_deal(
     new_ae_email = _email_for(new_ae_name, new_email_domain)
     new_se_email = _email_for(new_se_name, new_email_domain) if new_se_name else None
 
-    # --- structured metadata updates ---
-    metadata["sales_rep"]["vendor_company"] = new_vendor
-    metadata["sales_rep"]["name"] = new_ae_name
-    metadata["sales_rep"]["email"] = new_ae_email
-
-    if metadata.get("sales_engineer"):
-        metadata["sales_engineer"]["vendor_company"] = new_vendor
-        if new_se_name:
-            metadata["sales_engineer"]["name"] = new_se_name
-        if new_se_email:
-            metadata["sales_engineer"]["email"] = new_se_email
-
-    metadata["company"]["name"] = new_customer
-    if industry:
-        metadata["company"]["industry"] = industry
-        metadata["config"]["industry"] = industry
-    if deal_size:
-        metadata["config"]["deal_size"] = deal_size
+    # Build stakeholder remap (DO NOT mutate metadata yet — the atomic swap
+    # below operates on the serialized JSON and would re-rewrite anything we
+    # write in-place. We apply structured metadata fixes at the very end.)
+    customer_domain = _vendor_to_domain(new_customer)
+    used_names = {new_ae_name, new_se_name} - {None}
+    stakeholder_remap = []  # list of (src_name, new_name, src_email, new_email)
+    for sh in metadata.get("stakeholders", []) or []:
+        src_sh_name = sh.get("name")
+        if not src_sh_name:
+            continue
+        new_sh_name = _random_full_name(used_names)
+        src_sh_email = sh.get("email", "")
+        new_sh_email = _email_for(new_sh_name, customer_domain)
+        stakeholder_remap.append((src_sh_name, new_sh_name, src_sh_email, new_sh_email))
 
     new_deal_id = str(uuid.uuid4())
-    metadata["deal_id"] = new_deal_id
-    metadata["generated_at"] = (
-        datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
-    )
 
     # --- global string sweep over the whole deal JSON ---
     # Order matters: longer/more-specific tokens first so they don't get partially
@@ -137,35 +129,163 @@ def substitute_deal(
             return re.sub(r"\b" + re.escape(src) + r"\b", dst, text)
         return text.replace(src, dst)
 
+    # Non-name swaps run in fixed order; they don't collide with one another.
     deal_json = replace_token(deal_json, src_ae_email, new_ae_email, False)
     if src_se and src_se.get("email") and new_se_email:
         deal_json = replace_token(deal_json, src_se["email"], new_se_email, False)
+    for _, _, sh_src_email, sh_new_email in stakeholder_remap:
+        if sh_src_email:
+            deal_json = replace_token(deal_json, sh_src_email, sh_new_email, False)
     if src_email_domain:
         deal_json = replace_token(deal_json, src_email_domain, new_email_domain, False)
     deal_json = replace_token(deal_json, src_vendor, new_vendor, False)
-
-    # Customer: full name first, then first-word fallback for transcripts
-    # that say just "VelocityPay" instead of "VelocityPay Systems".
     deal_json = replace_token(deal_json, src_customer, new_customer, False)
     src_cust_first = src_customer.split()[0] if src_customer else ""
     new_cust_first = new_customer.split()[0] if new_customer else ""
     if src_cust_first and len(src_cust_first) > 3 and src_cust_first.lower() not in _GENERIC_WORDS:
         deal_json = replace_token(deal_json, src_cust_first, new_cust_first, True)
 
-    # Names: full -> first -> last so transcripts that drop to first/last
-    # name only ("Alex says...") also get rewritten.
-    _replace_name(deal_json, src_ae_name, new_ae_name)  # full
-    deal_json = _replace_name_inline(deal_json, src_ae_name, new_ae_name)
-    if src_se_name and new_se_name:
-        deal_json = _replace_name_inline(deal_json, src_se_name, new_se_name)
+    # Name swaps must run atomically — otherwise replacing SE first-name
+    # ("Sarah" -> "Devansh") would clobber the AE first-name we just
+    # installed if both share "Sarah".
+    name_swaps: List[tuple] = []
 
-    return json.loads(deal_json)
+    def _push(src: str, dst: str) -> None:
+        if src and dst and src != dst:
+            name_swaps.append((src, dst))
+
+    # Full names first (longest match wins during placeholder phase).
+    _push(src_ae_name, new_ae_name)
+    if src_se_name and new_se_name:
+        _push(src_se_name, new_se_name)
+    for sh_src, sh_new, _, _ in stakeholder_remap:
+        _push(sh_src, sh_new)
+    # First / last names
+    for src_full, new_full in (
+        [(src_ae_name, new_ae_name)]
+        + ([(src_se_name, new_se_name)] if src_se_name and new_se_name else [])
+        + [(s[0], s[1]) for s in stakeholder_remap]
+    ):
+        s_parts = src_full.split()
+        d_parts = new_full.split()
+        if len(s_parts) >= 1 and len(d_parts) >= 1:
+            _push(s_parts[0], d_parts[0])
+        if len(s_parts) >= 2 and len(d_parts) >= 2:
+            _push(s_parts[-1], d_parts[-1])
+
+    deal_json = _atomic_swap(deal_json, name_swaps, word_boundary=True)
+    deal = json.loads(deal_json)
+
+    # Structured metadata reassignment last so it can't be re-clobbered by the
+    # name sweeps above. These are the canonical record-of-truth fields.
+    md = deal["metadata"]
+    md["deal_id"] = new_deal_id
+    md["generated_at"] = (
+        datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+    )
+    md["sales_rep"]["vendor_company"] = new_vendor
+    md["sales_rep"]["name"] = new_ae_name
+    md["sales_rep"]["email"] = new_ae_email
+    if md.get("sales_engineer"):
+        md["sales_engineer"]["vendor_company"] = new_vendor
+        if new_se_name:
+            md["sales_engineer"]["name"] = new_se_name
+        if new_se_email:
+            md["sales_engineer"]["email"] = new_se_email
+    md["company"]["name"] = new_customer
+    if industry:
+        md["company"]["industry"] = industry
+        md["config"]["industry"] = industry
+    if deal_size:
+        md["config"]["deal_size"] = deal_size
+    for sh, (_, new_sh_name, _, new_sh_email) in zip(
+        md.get("stakeholders", []) or [], stakeholder_remap
+    ):
+        sh["name"] = new_sh_name
+        sh["email"] = new_sh_email
+
+    return deal
+
+
+def _atomic_swap(text: str, swaps: List[tuple], word_boundary: bool = True) -> str:
+    """
+    Replace many src tokens with dst tokens without inter-swap interference.
+    Pass 1: each src -> a unique placeholder. Pass 2: placeholder -> dst.
+    Sorted by src length desc so "Sarah Mitchell" wins over "Sarah" when
+    both are in the swap list.
+    """
+    seen_src = set()
+    unique_swaps = []
+    for src, dst in sorted(swaps, key=lambda s: -len(s[0])):
+        if src in seen_src:
+            continue
+        seen_src.add(src)
+        unique_swaps.append((src, dst))
+
+    placeholders = []
+    for i, (src, dst) in enumerate(unique_swaps):
+        ph = f"\x00NAME_REPL_{i}\x00"
+        placeholders.append((ph, dst))
+        if word_boundary:
+            text = re.sub(r"\b" + re.escape(src) + r"\b", ph, text)
+        else:
+            text = text.replace(src, ph)
+    for ph, dst in placeholders:
+        text = text.replace(ph, dst)
+    return text
 
 
 _GENERIC_WORDS = {
     "the", "and", "inc", "corp", "llc", "ltd", "co", "group", "systems",
     "solutions", "technologies", "services", "holdings", "global",
 }
+
+_FIRST_NAMES = [
+    "Aaron", "Aisha", "Alex", "Amanda", "Amir", "Andrea", "Anthony", "April",
+    "Beatriz", "Benjamin", "Brandon", "Brianna", "Caleb", "Camila", "Carlos",
+    "Caroline", "Chloe", "Christine", "Daniel", "Deepa", "Derek", "Diana",
+    "Dmitri", "Eli", "Elena", "Emily", "Erin", "Ethan", "Fatima", "Felix",
+    "Gabriel", "Grace", "Hannah", "Hassan", "Hiroshi", "Ian", "Imani", "Isaac",
+    "Isabel", "Jamal", "Jasmine", "Joshua", "Julia", "Karim", "Katherine",
+    "Kenji", "Khalid", "Kira", "Laila", "Lauren", "Leila", "Leo", "Liam",
+    "Lucia", "Malia", "Marcus", "Margaret", "Maya", "Mateo", "Megan", "Mira",
+    "Naomi", "Natalie", "Nicholas", "Noah", "Oliver", "Omar", "Owen", "Paige",
+    "Pavel", "Peter", "Priya", "Quincy", "Rafael", "Rebecca", "Riley", "Ruby",
+    "Samir", "Sanjay", "Shawn", "Shreya", "Simone", "Sofia", "Soren", "Tara",
+    "Theo", "Tristan", "Vera", "Victor", "Vivian", "Wei", "Wesley", "Xavier",
+    "Yara", "Yuki", "Zara", "Zoe",
+]
+
+_LAST_NAMES = [
+    "Adams", "Alvarez", "Anderson", "Bailey", "Banerjee", "Barnes", "Bell",
+    "Bennett", "Bishop", "Black", "Brooks", "Bryant", "Burke", "Butler",
+    "Campbell", "Carter", "Castro", "Coleman", "Collins", "Cox", "Crawford",
+    "Cruz", "Davies", "Diaz", "Dixon", "Edwards", "Elliott", "Fischer",
+    "Fitzgerald", "Fleming", "Ford", "Foster", "Franklin", "Gallagher", "Garcia",
+    "Gibson", "Goldberg", "Gomez", "Graves", "Greene", "Griffin", "Hamilton",
+    "Hanson", "Harper", "Hayes", "Hendricks", "Hernandez", "Holloway", "Hudson",
+    "Iqbal", "Jackson", "Jensen", "Jimenez", "Kapoor", "Kennedy", "Khan",
+    "Knight", "Kovacs", "Lambert", "Larsen", "Lawson", "Levine", "Lopez",
+    "Mackenzie", "Marquez", "Mason", "McCarthy", "Mendoza", "Miller", "Mitchell",
+    "Murphy", "Nakamura", "Nakashima", "Nguyen", "Norris", "Okafor", "Olsen",
+    "Ortiz", "Owens", "Park", "Pearson", "Petrov", "Phillips", "Pierce", "Powers",
+    "Quinn", "Ramirez", "Reeves", "Richardson", "Riley", "Rivera", "Robinson",
+    "Romero", "Russo", "Sanchez", "Santos", "Schaefer", "Schmidt", "Shah",
+    "Singh", "Snyder", "Sokolov", "Stevens", "Stewart", "Sullivan", "Suzuki",
+    "Tanaka", "Thompson", "Vargas", "Vasquez", "Walker", "Wallace", "Watson",
+    "Webb", "Wells", "Whitfield", "Wright", "Yamamoto", "Yoshida", "Zhao",
+]
+
+
+def _random_full_name(used: set) -> str:
+    """Pick a random first+last not already in `used`. Mutates `used`."""
+    for _ in range(200):
+        name = f"{random.choice(_FIRST_NAMES)} {random.choice(_LAST_NAMES)}"
+        if name not in used:
+            used.add(name)
+            return name
+    # Pool exhausted — fall back to indexed name
+    return f"Person {len(used)+1}"
 
 
 def _replace_name(text: str, src: str, dst: str) -> str:
